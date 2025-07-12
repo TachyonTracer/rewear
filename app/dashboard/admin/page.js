@@ -19,6 +19,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null);
   const [userStatuses, setUserStatuses] = useState({});
   const [productStatuses, setProductStatuses] = useState({});
+  const [productStatusFilter, setProductStatusFilter] = useState('all');
 
   useEffect(() => {
     if (!loading && (!user || user.account_type !== 'admin')) {
@@ -161,27 +162,35 @@ export default function AdminDashboard() {
   const toggleProductStatus = async (productId, currentStatus) => {
     try {
       const newStatus = currentStatus === 'active' ? 'blacklisted' : 'active';
-      
-      // Update local state immediately for better UX
       setProductStatuses(prev => ({
         ...prev,
         [productId]: newStatus
       }));
-
-      // Here you would make an API call to update the product status
-      // const response = await fetchWithAuth(`/api/admin/products/${productId}`, {
-      //   method: 'PATCH',
-      //   body: JSON.stringify({ status: newStatus })
-      // });
-      
+      // Update the product status in the database
+      const response = await fetchWithAuth(`/api/admin/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      // Only refresh if update was successful
+      if (response && (response.status === 'success' || response.status === 200 || response.ok)) {
+        await fetchAdminData();
+      } else {
+        throw new Error('Failed to update product status in database');
+      }
       console.log(`Product ${productId} status changed to ${newStatus}`);
     } catch (error) {
       console.error('Error updating product status:', error);
-      // Revert the status on error
       setProductStatuses(prev => ({
         ...prev,
         [productId]: currentStatus
       }));
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to update product status in database.',
+        icon: 'error',
+        customClass: { popup: 'rounded-2xl' }
+      });
     }
   };
 
@@ -526,14 +535,18 @@ export default function AdminDashboard() {
                       placeholder="Search products..."
                       className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
                     />
-                    <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
-                      <option>All Status</option>
-                      <option>Active</option>
-                      <option>Blacklisted</option>
+                    <select
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                      value={productStatusFilter}
+                      onChange={e => setProductStatusFilter(e.target.value)}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="active">Active</option>
+                      <option value="blacklisted">Blacklisted</option>
                     </select>
                   </div>
                 </div>
-                
+
                 {products.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -573,68 +586,74 @@ export default function AdminDashboard() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {products.map((product) => {
-                          const productStatus = getProductStatus(product.id);
-                          return (
-                            <tr key={product.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0 h-16 w-16">
-                                    <Image
-                                      src={product.image_urls?.[0] || 'https://placehold.co/64x64/9ACD32/ffffff?text=Product'}
-                                      alt={product.title}
-                                      width={64}
-                                      height={64}
-                                      className="h-16 w-16 rounded-lg object-cover"
-                                    />
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-900">{product.title}</div>
-                                    <div className="text-sm text-gray-500 max-w-xs truncate">
-                                      {product.description}
+                        {products
+                          .filter(product => {
+                            const status = getProductStatus(product.id);
+                            if (productStatusFilter === 'all') return true;
+                            return status === productStatusFilter;
+                          })
+                          .map((product) => {
+                            const productStatus = getProductStatus(product.id);
+                            return (
+                              <tr key={product.id}>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="flex items-center">
+                                    <div className="flex-shrink-0 h-16 w-16">
+                                      <Image
+                                        src={product.image_urls?.[0] || 'https://placehold.co/64x64/9ACD32/ffffff?text=Product'}
+                                        alt={product.title}
+                                        width={64}
+                                        height={64}
+                                        className="h-16 w-16 rounded-lg object-cover"
+                                      />
+                                    </div>
+                                    <div className="ml-4">
+                                      <div className="text-sm font-medium text-gray-900">{product.title}</div>
+                                      <div className="text-sm text-gray-500 max-w-xs truncate">
+                                        {product.description}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">{product.seller_name}</div>
-                                <div className="text-sm text-gray-500">{product.seller_email}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">₹{product.price}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                                  {product.condition_rating?.replace('_', ' ')}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                  productStatus === 'active' 
-                                    ? 'bg-green-100 text-green-800' 
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {productStatus === 'active' ? 'Active' : 'Blacklisted'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(product.created_at).toLocaleDateString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button
-                                  onClick={() => toggleProductStatus(product.id, productStatus)}
-                                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                                    productStatus === 'active'
-                                      ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                                      : 'bg-green-100 text-green-800 hover:bg-green-200'
-                                  }`}
-                                >
-                                  {productStatus === 'active' ? 'Blacklist' : 'Unblacklist'}
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm text-gray-900">{product.seller_name}</div>
+                                  <div className="text-sm text-gray-500">{product.seller_email}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="text-sm font-medium text-gray-900">₹{product.price}</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                    {product.condition_rating?.replace('_', ' ')}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                    productStatus === 'active' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {productStatus === 'active' ? 'Active' : 'Blacklisted'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {new Date(product.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                  <button
+                                    onClick={() => toggleProductStatus(product.id, productStatus)}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                                      productStatus === 'active'
+                                        ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                        : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    }`}
+                                  >
+                                    {productStatus === 'active' ? 'Blacklist' : 'Unblacklist'}
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
                       </tbody>
                     </table>
                   </div>
