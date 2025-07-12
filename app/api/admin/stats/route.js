@@ -19,8 +19,8 @@ export async function GET(request) {
     const [userCount, productCount, orderCount, sellersCount] = await Promise.all([
       query('SELECT COUNT(*) as count FROM users'),
       query('SELECT COUNT(*) as count FROM products'),
-      query('SELECT COUNT(*) as count FROM orders WHERE 1=1'), // Placeholder for when orders table exists
-      query('SELECT COUNT(DISTINCT seller_id) as count FROM products') // Active sellers (users who have listed products)
+      query('SELECT COUNT(*) as count FROM orders WHERE 1=1'), 
+      query('SELECT COUNT(DISTINCT seller_id) as count FROM products')
     ]);
 
    
