@@ -14,6 +14,11 @@ export async function GET(request) {
     if (!decoded || decoded.type !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
+    var where = "";
+    if (!decoded || decoded.type == 'admin')
+    {
+      where = "WHERE type != 'admin'";
+    }
 
     // Get all users with their details
     const users = await query(`
@@ -24,7 +29,7 @@ export async function GET(request) {
         type,
         created_at,
         updated_at
-      FROM users 
+      FROM users ${where}
       ORDER BY created_at DESC
     `);
 
