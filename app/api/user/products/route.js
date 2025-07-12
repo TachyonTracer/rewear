@@ -4,7 +4,15 @@ import { query } from '../../../../lib/db';
 
 export async function GET(request) {
   try {
-    const token = request.cookies.get('token')?.value;
+    // Try to get token from Authorization header first, then from cookies
+    const authHeader = request.headers.get('authorization');
+    let token = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else {
+      token = request.cookies.get('token')?.value;
+    }
     
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

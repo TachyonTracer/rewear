@@ -52,11 +52,7 @@ export default function ItemDetailPage() {
 
   const fetchUserProducts = async () => {
     try {
-      const response = await fetchWithAuth('/api/user/products');
-      if (!response.ok) {
-        throw new Error('Failed to fetch your products');
-      }
-      const data = await response.json();
+      const data = await fetchWithAuth('/api/user/products');
       setUserProducts(data.products || []);
     } catch (err) {
       console.error('Error fetching user products:', err);
@@ -93,7 +89,7 @@ export default function ItemDetailPage() {
 
     setSubmittingSwap(true);
     try {
-      const response = await fetchWithAuth('/api/swaps', {
+      const data = await fetchWithAuth('/api/swaps', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -104,11 +100,6 @@ export default function ItemDetailPage() {
           message: swapMessage
         })
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create swap request');
-      }
 
       Swal.fire({
         title: 'Success!',

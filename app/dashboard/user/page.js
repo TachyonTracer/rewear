@@ -66,11 +66,6 @@ export default function UserDashboard() {
         body: JSON.stringify({ response })
       });
 
-      if (!result.ok) {
-        const error = await result.json();
-        throw new Error(error.error || 'Failed to respond to swap request');
-      }
-
       Swal.fire({
         title: 'Success!',
         text: `Swap request ${response}ed successfully`,

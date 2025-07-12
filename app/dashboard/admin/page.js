@@ -173,7 +173,7 @@ export default function AdminDashboard() {
         body: JSON.stringify({ status: newStatus })
       });
       // Only refresh if update was successful
-      if (response && (response.status === 'success' || response.status === 200 || response.ok)) {
+      if (response && (response.status === 'success' || response.status === 200)) {
         await fetchAdminData();
       } else {
         throw new Error('Failed to update product status in database');
