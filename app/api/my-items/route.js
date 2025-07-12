@@ -55,7 +55,7 @@ export async function GET(request) {
       id: item.id,
       title: item.title,
       category: item.category_name,
-      price: `₹${item.price}`,
+      price: item.price,
       condition: item.condition_rating?.replace(/_/g, ' ') || 'Unknown',
       status: item.status === 'active' ? 'Available' : 'Unavailable',
       views: item.views_count || 0,

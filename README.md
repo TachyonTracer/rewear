@@ -1,9 +1,52 @@
-# Problem Statment : ReWear – Community Clothing Exchange 
+# Problem Statement : ReWear – Community Clothing Exchange
 
 # Team Name : Team 3139
 
 # Team Leader Email : priyanshpankhaniya@gmail.com
 
+# Our Site is Deployed at Vercel
+
+# Auth Credentials
+
+## Admin - Email : Alpha@123 , Password : Alpha@123
+## User - Email : Beta@123 , Password : Beta@123
+
+---
+
+## Google OAuth Setup
+
+To enable Google sign-in, you must set up OAuth credentials in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+
+1. Create OAuth 2.0 credentials.
+2. Add the following Authorized redirect URIs:
+   - For local development: `http://localhost:3000/api/auth/google/callback`
+   - For production: `https://<your-vercel-domain>/api/auth/google/callback`
+3. Copy your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+---
+
+## Environment Variables
+
+Create a `.env.local` file in your project root with the following:
+
+```
+NEXT_PUBLIC_APP_URL=http://localhost:3000 # or your deployed URL
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+```
+
+- For production, set `NEXT_PUBLIC_APP_URL` to your deployed Vercel domain (e.g., `https://rewear-tawny.vercel.app`).
+- Restart your dev server after changing environment variables.
+
+---
+
+## Real-Time Features & Vercel Limitations
+
+- **Online users and real-time features (WebSockets, in-memory state) will NOT work on Vercel** because Vercel is serverless and does not support persistent connections or shared memory.
+- For real-time features in production, use a service like [Pusher](https://pusher.com/), [Ably](https://ably.com/), or host your own WebSocket server on a traditional VM.
+- Locally, real-time features work because the server is persistent.
+
+---
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 

@@ -20,7 +20,6 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     profile_image VARCHAR(255),
     address VARCHAR(255),
@@ -234,7 +233,6 @@ VALUES ('Zara', 'zara', 'Fast fashion brand'),
 INSERT INTO users (
         email,
         password_hash,
-        name,
         phone,
         city,
         state,
@@ -243,7 +241,6 @@ INSERT INTO users (
 VALUES (
         'Alpha@123',
         'Alpha@123',
-        'Alpha',
         '555-0101',
         'New York',
         'NY',
@@ -252,7 +249,6 @@ VALUES (
     (
         'Beta@123',
         'Beta@123',
-        'Beta',
         '555-0102',
         'Los Angeles',
         'CA',
@@ -261,7 +257,6 @@ VALUES (
     (
         'Gamma@123',
         'Gamma@123',
-        'Gamma',
         '555-0103',
         'Chicago',
         'IL',
@@ -322,7 +317,7 @@ SELECT p.id,
     p.views_count,
     p.likes_count,
     p.created_at,
-    u.name as seller_name,
+    u.first_name || ' ' || u.last_name as seller_name,
     c.name as category_name,
     b.name as brand_name,
     p.image_urls [1] as primary_image
@@ -396,7 +391,7 @@ WHERE p.seller_id = 1
 ORDER BY p.created_at DESC;
 -- Query 6: Get product details with all images
 SELECT p.*,
-    u.name as seller_name,
+    u.first_name || ' ' || u.last_name as seller_name,
     u.profile_image as seller_profile_image,
     c.name as category_name,
     b.name as brand_name
@@ -413,7 +408,7 @@ SELECT o.id,
     p.title as product_title,
     p.price as product_price,
     p.image_urls [1] as product_image,
-    u.name as seller_name
+    u.first_name || ' ' || u.last_name as seller_name
 FROM orders o
     JOIN products p ON o.product_id = p.id
     JOIN users u ON o.seller_id = u.id
@@ -425,7 +420,7 @@ SELECT o.id,
     o.status,
     o.created_at,
     p.title as product_title,
-    u.name as buyer_name
+    u.first_name || ' ' || u.last_name as buyer_name
 FROM orders o
     JOIN products p ON o.product_id = p.id
     JOIN users u ON o.buyer_id = u.id
@@ -437,7 +432,7 @@ SELECT m.id,
     m.message,
     m.is_read,
     m.created_at,
-    u.name as sender_name,
+    u.first_name || ' ' || u.last_name as sender_name,
     p.title as product_title
 FROM messages m
     JOIN users u ON m.sender_id = u.id
@@ -477,7 +472,7 @@ GROUP BY c.id,
 ORDER BY total_products DESC;
 -- Query 12: Get user statistics
 SELECT u.id,
-    u.name,
+    u.first_name || ' ' || u.last_name as name,
     COUNT(DISTINCT p.id) as products_listed,
     COUNT(DISTINCT o.id) as orders_completed,
     ROUND(AVG(r.rating), 2) as avg_rating,
@@ -488,7 +483,7 @@ FROM users u
     AND o.status = 'delivered'
     LEFT JOIN reviews r ON u.id = r.reviewee_id
 GROUP BY u.id,
-    u.name
+    u.first_name || ' ' || u.last_name
 ORDER BY products_listed DESC;
 -- Query 13: Get monthly sales report
 SELECT TO_CHAR(o.created_at, 'YYYY-MM') as month,
@@ -653,7 +648,7 @@ SELECT p.id,
     p.image_urls,
     p.tags,
     p.created_at,
-    u.name as seller_name,
+    u.first_name || ' ' || u.last_name as seller_name,
     u.profile_image as seller_profile_image,
     c.name as category_name,
     b.name as brand_name

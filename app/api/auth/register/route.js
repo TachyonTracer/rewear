@@ -1,6 +1,7 @@
 // app/api/auth/register/route.js
 import { NextResponse } from 'next/server';
 import { createUser, generateToken } from '../../../../lib/auth.js';
+import { pool } from '../../../../lib/db';
 
 export async function POST(request) {
   try {
@@ -29,6 +30,15 @@ export async function POST(request) {
       return NextResponse.json(
         { error: 'Password must be at least 6 characters long' },
         { status: 400 }
+      );
+    }
+    
+    // Check if email already exists
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return NextResponse.json(
+        { error: 'User already exists with this email' },
+        { status: 409 }
       );
     }
     

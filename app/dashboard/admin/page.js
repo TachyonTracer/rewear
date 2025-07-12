@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -20,42 +20,42 @@ export default function AdminDashboard() {
   const [userStatuses, setUserStatuses] = useState({});
   const [productStatuses, setProductStatuses] = useState({});
   const [productStatusFilter, setProductStatusFilter] = useState('all');
+  const [showMobileNav, setShowMobileNav] = useState(false);
+  const [userPage, setUserPage] = useState(1);
+  const [userTotalPages, setUserTotalPages] = useState(1);
+  const [productPage, setProductPage] = useState(1);
+  const [productTotalPages, setProductTotalPages] = useState(1);
+  const USERS_PER_PAGE = 10;
+  const PRODUCTS_PER_PAGE = 10;
 
-  useEffect(() => {
-    if (!loading && (!user || user.account_type !== 'admin')) {
-      router.push('/');
-    }
-  }, [user, loading, router]);
-
-  // Fetch admin data from API
-  useEffect(() => {
-    if (!loading && user && user.account_type === 'admin') {
-      fetchAdminData();
-    }
-  }, [user, loading]);
-
-  const fetchAdminData = async () => {
+  const fetchAdminData = useCallback(async (userPageParam = userPage, productPageParam = productPage) => {
     setDataLoading(true);
     setError(null);
-    
     try {
       // Fetch admin data in parallel
       const [statsRes, usersRes, productsRes] = await Promise.all([
         fetchWithAuth('/api/admin/stats'),
-        fetchWithAuth('/api/admin/users'),
-        fetchWithAuth('/api/admin/products')
+        fetchWithAuth(`/api/admin/users?page=${userPageParam}&limit=${USERS_PER_PAGE}`),
+        fetchWithAuth(`/api/admin/products?page=${productPageParam}&limit=${PRODUCTS_PER_PAGE}`)
       ]);
-
       setStats(statsRes.stats || {});
       setUsers(usersRes.users || []);
+      setUserTotalPages(usersRes.pagination?.totalPages || 1);
       setProducts(productsRes.products || []);
+      setProductTotalPages(productsRes.pagination?.totalPages || 1);
     } catch (error) {
       console.error('Error fetching admin data:', error);
       setError('Failed to load admin data. Please try again.');
     } finally {
       setDataLoading(false);
     }
-  };
+  }, [userPage, productPage, USERS_PER_PAGE, PRODUCTS_PER_PAGE]);
+
+  useEffect(() => {
+    if (!loading && user && user.account_type === 'admin') {
+      fetchAdminData(userPage, productPage);
+    }
+  }, [user, loading, userPage, productPage, fetchAdminData]);
 
   if (loading) {
     return (
@@ -202,30 +202,30 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-green-200">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="text-2xl font-bold text-green-600">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <Link href="/" className="text-xl sm:text-2xl font-bold text-green-600">
                 ReWear
               </Link>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <span className="text-lg font-medium text-gray-700">Admin Dashboard</span>
+              <div className="hidden sm:block h-6 w-px bg-gray-300"></div>
+              <span className="text-base sm:text-lg font-medium text-gray-700">Admin Dashboard</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="flex items-center space-x-1 sm:space-x-2">
                 <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
                   <span className="text-white font-medium text-sm">
-                    {user.name?.charAt(0)?.toUpperCase() || 'A'}
+                    {(user.first_name?.charAt(0) || '').toUpperCase() || 'A'}
                   </span>
                 </div>
-                <span className="text-gray-700">{user.name}</span>
+                <span className="text-gray-700 text-sm sm:text-base">{user.first_name} {user.last_name}</span>
                 <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded-full text-xs font-medium">
                   Admin
                 </span>
               </div>
               <button
                 onClick={handleLogout}
-                className="text-red-600 hover:text-red-700 font-medium"
+                className="text-red-600 hover:text-red-700 font-medium text-sm sm:text-base"
               >
                 Logout
               </button>
@@ -233,9 +233,19 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+      {/* Breadcrumb */}
+      <nav className="bg-white border-b border-green-100" aria-label="Breadcrumb">
+        <ol className="max-w-7xl mx-auto flex items-center space-x-2 px-2 sm:px-4 py-2 text-sm text-gray-500">
+          <li>
+            <Link href="/" className="hover:text-green-700 transition-colors">Home</Link>
+          </li>
+          <li className="text-gray-400">/</li>
+          <li className="text-green-700 font-medium">Admin Dashboard</li>
+        </ol>
+      </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-8">
         {/* Welcome Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6 mb-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -276,7 +286,7 @@ export default function AdminDashboard() {
         {!dataLoading && !error && (
           <div className="space-y-8">
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -340,392 +350,500 @@ export default function AdminDashboard() {
 
             {/* Navigation Tabs */}
             <div className="bg-white rounded-2xl shadow-sm border border-green-200">
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6" aria-label="Tabs">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'overview'
-                    ? 'border-green-600 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'users'
-                    ? 'border-green-600 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                User Management
-              </button>
-              <button
-                onClick={() => setActiveTab('products')}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'products'
-                    ? 'border-green-600 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Product Management
-              </button>
-              <button
-                onClick={() => setActiveTab('reports')}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'reports'
-                    ? 'border-green-600 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Reports
-              </button>
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === 'settings'
-                    ? 'border-green-600 text-green-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                System Settings
-              </button>
-            </nav>
-          </div>
-
-          {/* Tab Content */}
-          <div className="p-6">
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold text-gray-900">Platform Overview</h2>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="font-medium text-gray-900 mb-4">Recent Activity</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-sm text-gray-600">New user registered: John Doe</span>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span className="text-sm text-gray-600">Product approved: Vintage Denim Jacket</span>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                        <span className="text-sm text-gray-600">Product pending review: Summer Dress</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-6">
-                    <h3 className="font-medium text-gray-900 mb-4">Quick Actions</h3>
-                    <div className="space-y-3">
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Review Pending Products
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Generate Revenue Report
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Send Platform Newsletter
-                      </button>
-                    </div>
-                  </div>
+              <div className="border-b border-gray-200 overflow-x-auto">
+                {/* Mobile menu button */}
+                <div className="flex sm:hidden justify-end px-2 py-2">
+                  <button
+                    onClick={() => setShowMobileNav((prev) => !prev)}
+                    className="inline-flex items-center justify-center p-2 rounded-md text-green-600 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                    aria-label="Open navigation menu"
+                  >
+                    <svg className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </button>
                 </div>
-              </div>
-            )}
-
-            {/* Users Tab */}
-            {activeTab === 'users' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold text-gray-900">User Management</h2>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      placeholder="Search users..."
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                    />
-                    <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
-                      Search
+                {/* Desktop nav */}
+                <nav className="hidden sm:flex flex-nowrap space-x-4 sm:space-x-8 px-2 sm:px-6 overflow-x-auto scrollbar-thin" aria-label="Tabs">
+                  <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'overview'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Overview
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('users')}
+                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'users'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    User Management
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('products')}
+                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'products'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Product Management
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('reports')}
+                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'reports'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    Reports
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('settings')}
+                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'settings'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    System Settings
+                  </button>
+                </nav>
+                {/* Mobile nav dropdown */}
+                {showMobileNav && (
+                  <nav className="flex flex-col sm:hidden px-2 pb-2 space-y-2 bg-white z-10 rounded-b-2xl shadow-md" aria-label="Mobile Tabs">
+                    <button
+                      onClick={() => { setActiveTab('overview'); setShowMobileNav(false); }}
+                      className={`w-full text-left py-2 px-2 rounded font-medium text-sm transition-colors ${
+                        activeTab === 'overview'
+                          ? 'bg-green-100 text-green-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      Overview
                     </button>
+                    <button
+                      onClick={() => { setActiveTab('users'); setShowMobileNav(false); }}
+                      className={`w-full text-left py-2 px-2 rounded font-medium text-sm transition-colors ${
+                        activeTab === 'users'
+                          ? 'bg-green-100 text-green-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      User Management
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('products'); setShowMobileNav(false); }}
+                      className={`w-full text-left py-2 px-2 rounded font-medium text-sm transition-colors ${
+                        activeTab === 'products'
+                          ? 'bg-green-100 text-green-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      Product Management
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('reports'); setShowMobileNav(false); }}
+                      className={`w-full text-left py-2 px-2 rounded font-medium text-sm transition-colors ${
+                        activeTab === 'reports'
+                          ? 'bg-green-100 text-green-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      Reports
+                    </button>
+                    <button
+                      onClick={() => { setActiveTab('settings'); setShowMobileNav(false); }}
+                      className={`w-full text-left py-2 px-2 rounded font-medium text-sm transition-colors ${
+                        activeTab === 'settings'
+                          ? 'bg-green-100 text-green-700'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      System Settings
+                    </button>
+                  </nav>
+                )}
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-2 sm:p-6">
+                {/* Overview Tab */}
+                {activeTab === 'overview' && (
+                  <div className="space-y-6">
+                    <h2 className="text-xl font-bold text-gray-900">Platform Overview</h2>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="bg-gray-50 rounded-lg p-6">
+                        <h3 className="font-medium text-gray-900 mb-4">Recent Activity</h3>
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span className="text-sm text-gray-600">New user registered: John Doe</span>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-sm text-gray-600">Product approved: Vintage Denim Jacket</span>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span className="text-sm text-gray-600">Product pending review: Summer Dress</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-lg p-6">
+                        <h3 className="font-medium text-gray-900 mb-4">Quick Actions</h3>
+                        <div className="space-y-3">
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Review Pending Products
+                          </button>
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Generate Revenue Report
+                          </button>
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Send Platform Newsletter
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          User
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Join Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {users.length === 0 ? (
-                        <tr>
-                          <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
-                            No users found.
-                          </td>
-                        </tr>
-                      ) : (
-                        users.map((user) => {
-                          const userStatus = getUserStatus(user.id);
-                          return (
-                            <tr key={user.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                                  <div className="text-sm text-gray-500">{user.email}</div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                  userStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {userStatus === 'active' ? 'Active' : 'Suspended'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(user.created_at).toLocaleDateString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button
-                                  onClick={() => toggleUserStatus(user.id, userStatus)}
-                                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                                    userStatus === 'active'
-                                      ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                                      : 'bg-green-100 text-green-800 hover:bg-green-200'
-                                  }`}
-                                >
-                                  {userStatus === 'active' ? 'Suspend' : 'Activate'}
-                                </button>
+                )}
+
+                {/* Users Tab */}
+                {activeTab === 'users' && (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                      <h2 className="text-lg sm:text-xl font-bold text-gray-900">User Management</h2>
+                      <div className="flex space-x-2 w-full sm:w-auto">
+                        <input
+                          type="text"
+                          placeholder="Search users..."
+                          className="flex-1 px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-sm"
+                        />
+                        <button className="bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
+                          Search
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+                      <table className="w-full min-w-[600px] text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              User
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Status
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Join Date
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {users.length === 0 ? (
+                            <tr>
+                              <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
+                                No users found.
                               </td>
                             </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Products Tab */}
-            {activeTab === 'products' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold text-gray-900">Product Management</h2>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      placeholder="Search products..."
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                    />
-                    <select
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                      value={productStatusFilter}
-                      onChange={e => setProductStatusFilter(e.target.value)}
-                    >
-                      <option value="all">All Status</option>
-                      <option value="active">Active</option>
-                      <option value="blacklisted">Blacklisted</option>
-                    </select>
-                  </div>
-                </div>
-
-                {products.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
+                          ) : (
+                            users.map((user) => {
+                              const userStatus = getUserStatus(user.id);
+                              return (
+                                <tr key={user.id}>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div>
+                                      <div className="text-sm font-medium text-gray-900">{user.first_name} {user.last_name}</div>
+                                      <div className="text-sm text-gray-500">{user.email}</div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                      userStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {userStatus === 'active' ? 'Active' : 'Suspended'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {new Date(user.created_at).toLocaleDateString()}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button
+                                      onClick={() => toggleUserStatus(user.id, userStatus)}
+                                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                                        userStatus === 'active'
+                                          ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                          : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                      }`}
+                                    >
+                                      {userStatus === 'active' ? 'Suspend' : 'Activate'}
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                      {/* Pagination Controls */}
+                      <div className="flex justify-between items-center py-4 px-2">
+                        <button
+                          onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                          disabled={userPage === 1}
+                          className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <span className="text-sm text-gray-600">
+                          Page {userPage} of {userTotalPages}
+                        </span>
+                        <button
+                          onClick={() => setUserPage((p) => Math.min(userTotalPages, p + 1))}
+                          disabled={userPage === userTotalPages}
+                          className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
-                    <p className="text-gray-600">Products will appear here as sellers add them.</p>
                   </div>
-                ) : (
-                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Product
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Seller
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Price
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Condition
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Status
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Listed Date
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {products
-                          .filter(product => {
-                            const status = getProductStatus(product.id);
-                            if (productStatusFilter === 'all') return true;
-                            return status === productStatusFilter;
-                          })
-                          .map((product) => {
-                            const productStatus = getProductStatus(product.id);
-                            return (
-                              <tr key={product.id}>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="flex items-center">
-                                    <div className="flex-shrink-0 h-16 w-16">
-                                      <Image
-                                        src={product.image_urls?.[0] || 'https://placehold.co/64x64/9ACD32/ffffff?text=Product'}
-                                        alt={product.title}
-                                        width={64}
-                                        height={64}
-                                        className="h-16 w-16 rounded-lg object-cover"
-                                      />
-                                    </div>
-                                    <div className="ml-4">
-                                      <div className="text-sm font-medium text-gray-900">{product.title}</div>
-                                      <div className="text-sm text-gray-500 max-w-xs truncate">
-                                        {product.description}
+                )}
+
+                {/* Products Tab */}
+                {activeTab === 'products' && (
+                  <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                      <h2 className="text-lg sm:text-xl font-bold text-gray-900">Product Management</h2>
+                      <div className="flex space-x-2 w-full sm:w-auto">
+                        <input
+                          type="text"
+                          placeholder="Search products..."
+                          className="flex-1 px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-sm"
+                        />
+                        <select
+                          className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-sm"
+                          value={productStatusFilter}
+                          onChange={e => setProductStatusFilter(e.target.value)}
+                        >
+                          <option value="all">All Status</option>
+                          <option value="active">Active</option>
+                          <option value="blacklisted">Blacklisted</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {products.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+                        <p className="text-gray-600">Products will appear here as sellers add them.</p>
+                      </div>
+                    ) : (
+                      <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+                        <table className="w-full min-w-[800px] text-sm">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Product
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Seller
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Price
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Condition
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Status
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Listed Date
+                              </th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {products
+                              .filter(product => {
+                                const status = getProductStatus(product.id);
+                                if (productStatusFilter === 'all') return true;
+                                return status === productStatusFilter;
+                              })
+                              .map((product) => {
+                                const productStatus = getProductStatus(product.id);
+                                return (
+                                  <tr key={product.id}>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="flex items-center">
+                                        <div className="flex-shrink-0 h-16 w-16">
+                                          <Image
+                                            src={product.image_urls?.[0] || 'https://placehold.co/64x64/9ACD32/ffffff?text=Product'}
+                                            alt={product.title}
+                                            width={64}
+                                            height={64}
+                                            className="h-16 w-16 rounded-lg object-cover"
+                                          />
+                                        </div>
+                                        <div className="ml-4">
+                                          <div className="text-sm font-medium text-gray-900">{product.title}</div>
+                                          <div className="text-sm text-gray-500 max-w-xs truncate">
+                                            {product.description}
+                                          </div>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-gray-900">{product.seller_name}</div>
-                                  <div className="text-sm text-gray-500">{product.seller_email}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm font-medium text-gray-900">₹{product.price}</div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                                    {product.condition_rating?.replace('_', ' ')}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                    productStatus === 'active' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {productStatus === 'active' ? 'Active' : 'Blacklisted'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {new Date(product.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                  <button
-                                    onClick={() => toggleProductStatus(product.id, productStatus)}
-                                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                                      productStatus === 'active'
-                                        ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                                        : 'bg-green-100 text-green-800 hover:bg-green-200'
-                                    }`}
-                                  >
-                                    {productStatus === 'active' ? 'Blacklist' : 'Unblacklist'}
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="text-sm text-gray-900">{product.seller_name}</div>
+                                      <div className="text-sm text-gray-500">{product.seller_email}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <div className="text-sm font-medium text-gray-900">₹{product.price}</div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                        {product.condition_rating?.replace('_', ' ')}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                      <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                        productStatus === 'active' 
+                                          ? 'bg-green-100 text-green-800' 
+                                          : 'bg-red-100 text-red-800'
+                                      }`}>
+                                        {productStatus === 'active' ? 'Active' : 'Blacklisted'}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                      {new Date(product.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                      <button
+                                        onClick={() => toggleProductStatus(product.id, productStatus)}
+                                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                                          productStatus === 'active'
+                                            ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                            : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                        }`}
+                                      >
+                                        {productStatus === 'active' ? 'Blacklist' : 'Unblacklist'}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                        {/* Pagination Controls */}
+                        <div className="flex justify-between items-center py-4 px-2">
+                          <button
+                            onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                            disabled={productPage === 1}
+                            className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
+                          >
+                            Previous
+                          </button>
+                          <span className="text-sm text-gray-600">
+                            Page {productPage} of {productTotalPages}
+                          </span>
+                          <button
+                            onClick={() => setProductPage((p) => Math.min(productTotalPages, p + 1))}
+                            disabled={productPage === productTotalPages}
+                            className="px-3 py-1 rounded bg-gray-100 text-gray-700 disabled:opacity-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Reports Tab */}
+                {activeTab === 'reports' && (
+                  <div className="space-y-6">
+                    <h2 className="text-xl font-bold text-gray-900">Reports & Analytics</h2>
+                    
+                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                      <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Advanced Reports Coming Soon</h3>
+                      <p className="text-gray-600">
+                        Get detailed insights about platform performance, user behavior, and financial analytics.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Settings Tab */}
+                {activeTab === 'settings' && (
+                  <div className="space-y-6">
+                    <h2 className="text-xl font-bold text-gray-900">System Settings</h2>
+                    
+                    <div className="space-y-6">
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="font-medium text-gray-900 mb-2">Platform Configuration</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Manage platform-wide settings and configurations
+                        </p>
+                        <div className="space-y-3">
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Site Settings
+                          </button>
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Payment Gateway Settings
+                          </button>
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Email Templates
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="font-medium text-gray-900 mb-2">Security & Compliance</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Manage security settings and compliance features
+                        </p>
+                        <div className="space-y-3">
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Security Policies
+                          </button>
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Data Privacy Settings
+                          </button>
+                          <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                            Audit Logs
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
-            )}
-
-            {/* Reports Tab */}
-            {activeTab === 'reports' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold text-gray-900">Reports & Analytics</h2>
-                
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Advanced Reports Coming Soon</h3>
-                  <p className="text-gray-600">
-                    Get detailed insights about platform performance, user behavior, and financial analytics.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Settings Tab */}
-            {activeTab === 'settings' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold text-gray-900">System Settings</h2>
-                
-                <div className="space-y-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 mb-2">Platform Configuration</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Manage platform-wide settings and configurations
-                    </p>
-                    <div className="space-y-3">
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Site Settings
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Payment Gateway Settings
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Email Templates
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 mb-2">Security & Compliance</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Manage security settings and compliance features
-                    </p>
-                    <div className="space-y-3">
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Security Policies
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Data Privacy Settings
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Audit Logs
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
           </div>
         )}
       </div>

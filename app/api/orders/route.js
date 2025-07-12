@@ -29,32 +29,45 @@ export async function GET(request) {
 
     const userId = decoded.userId;
     
-    // For now, return empty orders array since we don't have an orders table yet
-    // In a real application, you would create an orders table and fetch real data
-    const mockOrders = [
-      {
-        id: 1,
-        orderNumber: `ORD-${userId}-001`,
-        date: new Date().toISOString().split('T')[0],
-        total: 1550,
-        status: 'Delivered',
-        items: 2,
-        image: 'https://placehold.co/100x100/6B8E23/ffffff?text=Order'
-      },
-      {
-        id: 2,
-        orderNumber: `ORD-${userId}-002`,
-        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        total: 850,
-        status: 'In Transit',
-        items: 1,
-        image: 'https://placehold.co/100x100/8FBC8F/ffffff?text=Order'
-      }
-    ];
+    // Fetch real orders from database
+    const ordersResult = await query(`
+      SELECT 
+        o.id,
+        o.total_amount,
+        o.status,
+        o.payment_method,
+        o.created_at,
+        p.title as product_title,
+        p.price as product_price,
+        p.image_urls[1] as product_image,
+        u.name as seller_name,
+        p.id as product_id
+      FROM orders o
+      JOIN products p ON o.product_id = p.id
+      JOIN users u ON o.seller_id = u.id
+      WHERE o.buyer_id = $1
+      ORDER BY o.created_at DESC
+    `, [userId]);
+
+    // Transform the data to match the expected format
+    const orders = ordersResult.rows.map((order, index) => ({
+      id: order.id,
+      orderNumber: `ORD-${String(order.id).padStart(6, '0')}`,
+      date: new Date(order.created_at).toLocaleDateString(),
+      total: `₹${parseFloat(order.total_amount).toFixed(2)}`,
+      status: order.status.charAt(0).toUpperCase() + order.status.slice(1),
+      items: 1, // Each order is for one product in this system
+      image: order.product_image || `https://placehold.co/100x100/6B8E23/ffffff?text=${encodeURIComponent(order.product_title)}`,
+      productTitle: order.product_title,
+      productPrice: `₹${parseFloat(order.product_price).toFixed(2)}`,
+      sellerName: order.seller_name,
+      paymentMethod: order.payment_method,
+      productId: order.product_id
+    }));
 
     return NextResponse.json({
       success: true,
-      orders: mockOrders
+      orders: orders
     });
 
   } catch (error) {

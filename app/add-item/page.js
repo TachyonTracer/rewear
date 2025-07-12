@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../hooks/useAuth.js';
+import { fetchWithAuth } from '../../lib/api.js';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function AddItemPage() {
   const { user } = useAuth();
@@ -22,6 +24,10 @@ export default function AddItemPage() {
     is_negotiable: false,
     images: []
   });
+  
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [imageUrls, setImageUrls] = useState([]);
   
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,18 +68,73 @@ export default function AddItemPage() {
     }));
   };
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
-    // For now, we'll just store the file names
-    // In a real app, you'd upload to cloud storage
-    setFormData(prev => ({
-      ...prev,
-      images: files.map(file => file.name)
-    }));
+    if (files.length === 0) return;
+
+    setSelectedFiles(files);
+    setUploadingImages(true);
+
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('images', file);
+      });
+
+      const response = await fetchWithAuth('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (response.success) {
+        const urls = response.files.map(file => file.url);
+        setImageUrls(urls);
+        setFormData(prev => ({
+          ...prev,
+          images: response.files.map(file => file.originalName)
+        }));
+      } else {
+        throw new Error(response.error || 'Failed to upload images');
+      }
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      setError(error.message || 'Failed to upload images');
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (uploadingImages) {
+      setError('Please wait for images to finish uploading before submitting.');
+      return;
+    }
+    // --- Strong client-side validation ---
+    const errors = [];
+    if (!formData.title || formData.title.length < 3 || formData.title.length > 100) {
+      errors.push('Title is required (3-100 chars).');
+    }
+    if (!formData.description || formData.description.length < 10 || formData.description.length > 1000) {
+      errors.push('Description is required (10-1000 chars).');
+    }
+    if (!formData.price || isNaN(Number(formData.price)) || Number(formData.price) <= 0) {
+      errors.push('Price must be a positive number.');
+    }
+    if (formData.original_price && (isNaN(Number(formData.original_price)) || Number(formData.original_price) < Number(formData.price))) {
+      errors.push('Original price must be greater than or equal to price.');
+    }
+    if (!formData.category_id) {
+      errors.push('Category is required.');
+    }
+    if (imageUrls.length === 0) {
+      errors.push('At least one image must be uploaded.');
+    }
+    if (errors.length > 0) {
+      setError(errors.join(' '));
+      return;
+    }
     setLoading(true);
     setError('');
 
@@ -83,13 +144,13 @@ export default function AddItemPage() {
         price: parseFloat(formData.price),
         original_price: formData.original_price ? parseFloat(formData.original_price) : null,
         tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-        // For demo purposes, using placeholder images
-        image_urls: formData.images.length > 0 
-          ? formData.images.map((img, index) => `https://placehold.co/600x400/6B8E23/ffffff?text=${encodeURIComponent(formData.title)}-${index + 1}`)
+        // Use actual uploaded image URLs or fallback to placeholder
+        image_urls: imageUrls.length > 0 
+          ? imageUrls
           : [`https://placehold.co/600x400/6B8E23/ffffff?text=${encodeURIComponent(formData.title)}`]
       };
 
-      const response = await fetch('/api/products', {
+      const response = await fetchWithAuth('/api/products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -97,9 +158,7 @@ export default function AddItemPage() {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.success) {
         setSuccess(true);
         setTimeout(() => {
           // Redirect to appropriate dashboard based on user type
@@ -109,7 +168,7 @@ export default function AddItemPage() {
           router.push(dashboardRoute);
         }, 2000);
       } else {
-        setError(data.error || 'Failed to create item');
+        setError(response.error || 'Failed to create item');
       }
     } catch (error) {
       setError('Failed to create item. Please try again.');
@@ -348,19 +407,62 @@ export default function AddItemPage() {
                   onChange={handleImageUpload}
                   className="hidden"
                   id="image-upload"
+                  disabled={uploadingImages}
                 />
                 <label
                   htmlFor="image-upload"
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors cursor-pointer"
+                  className={`inline-block px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                    uploadingImages 
+                      ? 'bg-gray-400 text-white cursor-not-allowed' 
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
                 >
-                  Choose Files
+                  {uploadingImages ? 'Uploading...' : 'Choose Files'}
                 </label>
-                {formData.images.length > 0 && (
+                
+                {/* Upload Progress */}
+                {uploadingImages && (
                   <div className="mt-4">
-                    <p className="text-sm text-green-600">Selected: {formData.images.join(', ')}</p>
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                      <span className="text-sm text-gray-600">Uploading images...</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Selected Files */}
+                {formData.images.length > 0 && !uploadingImages && (
+                  <div className="mt-4">
+                    <p className="text-sm text-green-600 mb-2">✅ Uploaded: {formData.images.join(', ')}</p>
                   </div>
                 )}
               </div>
+              
+              {/* Image Previews */}
+              {imageUrls.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Image Previews:</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {imageUrls.map((url, index) => (
+                      <div key={index} className="relative">
+                        <Image
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          width={120}
+                          height={96}
+                          className="w-full h-24 object-cover rounded-lg border border-gray-200"
+                          unoptimized
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-opacity rounded-lg flex items-center justify-center">
+                          <span className="text-white text-xs opacity-0 hover:opacity-100 transition-opacity">
+                            Image {index + 1}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Negotiable Option */}
@@ -388,10 +490,10 @@ export default function AddItemPage() {
               </Link>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || uploadingImages}
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Adding Item...' : 'Add Item'}
+                {loading ? 'Adding Item...' : uploadingImages ? 'Uploading Images...' : 'Add Item'}
               </button>
             </div>
           </form>

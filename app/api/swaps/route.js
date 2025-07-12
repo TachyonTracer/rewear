@@ -62,13 +62,23 @@ export async function GET(request) {
     // Transform the data for frontend
     const swaps = swapsResult.rows.map(swap => ({
       id: swap.id,
+      requester_id: swap.requester_id,
+      target_user_id: swap.target_user_id,
+      status: swap.status,
+      message: swap.message,
+      created_at: swap.created_at,
+      updated_at: swap.updated_at,
+      // Product information
+      offered_product_name: swap.swap_type === 'outgoing' ? swap.requester_product_title : swap.target_product_title,
+      requested_product_name: swap.swap_type === 'outgoing' ? swap.target_product_title : swap.requester_product_title,
+      // User information
+      other_user_name: swap.swap_type === 'outgoing' ? swap.target_user_name : swap.requester_name,
+      // Legacy fields for backward compatibility
       itemOffered: swap.swap_type === 'outgoing' ? swap.requester_product_title : swap.target_product_title,
       itemRequested: swap.swap_type === 'outgoing' ? swap.target_product_title : swap.requester_product_title,
       otherUser: swap.swap_type === 'outgoing' ? swap.target_user_name : swap.requester_name,
-      status: swap.status,
       date: new Date(swap.created_at).toISOString().split('T')[0],
       type: swap.swap_type,
-      message: swap.message,
       offeredImage: swap.swap_type === 'outgoing' 
         ? (swap.requester_product_images?.[0] || null)
         : (swap.target_product_images?.[0] || null),

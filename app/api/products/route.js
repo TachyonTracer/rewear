@@ -3,6 +3,18 @@ import { NextResponse } from 'next/server';
 import { withOptionalAuth } from '../../../lib/middleware.js';
 import { query } from '../../../lib/db.js';
 
+// --- In-memory cache for product list ---
+const productListCache = {
+  data: null,
+  key: '',
+  timestamp: 0,
+  ttl: 60 * 1000 // 1 minute
+};
+
+function getCacheKey({ category, search, page, limit }) {
+  return `${category || ''}|${search || ''}|${page || 1}|${limit || 20}`;
+}
+
 async function handler(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -12,6 +24,16 @@ async function handler(request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = (page - 1) * limit;
     
+    // --- Caching logic ---
+    const cacheKey = getCacheKey({ category, search, page, limit });
+    if (
+      productListCache.data &&
+      productListCache.key === cacheKey &&
+      Date.now() - productListCache.timestamp < productListCache.ttl
+    ) {
+      return NextResponse.json(productListCache.data);
+    }
+
     let queryText = `
       SELECT 
         p.id,
@@ -80,7 +102,14 @@ async function handler(request) {
     
     const countParams = [];
     let countParamIndex = 1;
-    
+
+    // Exclude current user's products if user is authenticated (fix)
+    if (request.user) {
+      countQuery += ` AND p.seller_id != $${countParamIndex}`;
+      countParams.push(request.user.id);
+      countParamIndex++;
+    }
+
     if (category) {
       countQuery += ` AND c.name = $${countParamIndex}`;
       countParams.push(category);
@@ -100,8 +129,7 @@ async function handler(request) {
     
     const countResult = await query(countQuery, countParams);
     const totalCount = parseInt(countResult.rows[0].total);
-    
-    return NextResponse.json({
+    const responseData = {
       products: result.rows,
       pagination: {
         page,
@@ -111,8 +139,13 @@ async function handler(request) {
         hasNext: page < Math.ceil(totalCount / limit),
         hasPrev: page > 1
       },
-      user: request.user || null // Include user info if authenticated
-    });
+      user: request.user || null
+    };
+    // --- Set cache ---
+    productListCache.data = responseData;
+    productListCache.key = cacheKey;
+    productListCache.timestamp = Date.now();
+    return NextResponse.json(responseData);
     
   } catch (error) {
     console.error('Get products error:', error);
@@ -126,12 +159,12 @@ async function handler(request) {
 export const GET = withOptionalAuth(handler);
 
 // POST handler for creating new products
-export async function POST(request) {
+import { withAuth } from '../../../lib/middleware.js';
+
+async function handlePOST(request) {
   try {
     const body = await request.json();
     
-    // For now, we'll create products without authentication
-    // In a real app, you'd require authentication
     const {
       title,
       description,
@@ -146,17 +179,31 @@ export async function POST(request) {
       is_negotiable
     } = body;
 
-    // Validate required fields
-    if (!title || !description || !price || !category_id) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+    // --- Strong validation ---
+    const errors = [];
+    if (!title || typeof title !== 'string' || title.length < 3 || title.length > 100) {
+      errors.push('Title is required (3-100 chars).');
+    }
+    if (!description || typeof description !== 'string' || description.length < 10 || description.length > 1000) {
+      errors.push('Description is required (10-1000 chars).');
+    }
+    if (price === undefined || isNaN(Number(price)) || Number(price) <= 0) {
+      errors.push('Price must be a positive number.');
+    }
+    if (original_price && (isNaN(Number(original_price)) || Number(original_price) < Number(price))) {
+      errors.push('Original price must be greater than or equal to price.');
+    }
+    if (!category_id || typeof category_id !== 'string') {
+      errors.push('Category is required.');
+    }
+    if (image_urls && (!Array.isArray(image_urls) || image_urls.length === 0)) {
+      errors.push('At least one image URL is required.');
+    }
+    if (errors.length > 0) {
+      return NextResponse.json({ error: errors.join(' ') }, { status: 400 });
     }
 
-    // For demo purposes, use a default seller_id
-    // In a real app, you'd get this from the authenticated user
-    const seller_id = 1; // Using the first user as default seller
+    const seller_id = request.user.id;
 
     const insertQuery = `
       INSERT INTO products (
@@ -182,18 +229,49 @@ export async function POST(request) {
     ];
 
     const result = await query(insertQuery, values);
+    const product = result.rows[0];
     
+    // Award points for product upload
+    try {
+      await fetch(`${request.url.split('/api')[0]}/api/points/earn`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': request.headers.get('Authorization') || request.headers.get('authorization')
+        },
+        body: JSON.stringify({
+          action: 'product_upload',
+          referenceId: product.id,
+          referenceType: 'product'
+        })
+      });
+    } catch (pointsError) {
+      console.error('Error awarding points:', pointsError);
+      // Don't fail product creation if points awarding fails
+    }
+    
+    // Invalidate product list cache
+    productListCache.data = null;
+    productListCache.key = '';
+    productListCache.timestamp = 0;
+
     return NextResponse.json({
       success: true,
-      message: 'Product created successfully',
-      product: result.rows[0]
+      message: 'Product created successfully! You earned 10 points.',
+      product: product
     }, { status: 201 });
 
   } catch (error) {
+    let message = 'Internal server error';
+    if (error instanceof SyntaxError) {
+      message = 'Invalid JSON in request body.';
+    }
     console.error('Create product error:', error);
     return NextResponse.json(
-      { error: 'Failed to create product' },
+      { error: message },
       { status: 500 }
     );
   }
 }
+
+export const POST = withAuth(handlePOST);
