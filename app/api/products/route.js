@@ -39,6 +39,13 @@ async function handler(request) {
     const queryParams = [];
     let paramIndex = 1;
     
+    // Exclude current user's products if user is authenticated
+    if (request.user) {
+      queryText += ` AND p.seller_id != $${paramIndex}`;
+      queryParams.push(request.user.id);
+      paramIndex++;
+    }
+    
     if (category) {
       queryText += ` AND c.name = $${paramIndex}`;
       queryParams.push(category);
