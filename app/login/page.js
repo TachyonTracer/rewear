@@ -12,15 +12,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const { login, loading, isAuthenticated } = useAuth();
+  const { login, loading, isAuthenticated, user } = useAuth();
   const router = useRouter();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated to appropriate dashboard
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/');
+    if (isAuthenticated && user) {
+      const dashboardRoutes = {
+        admin: '/dashboard/admin',
+        seller: '/dashboard/seller',
+        user: '/dashboard/user'
+      };
+      
+      const route = dashboardRoutes[user.account_type] || '/';
+      router.push(route);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,7 +46,17 @@ export default function LoginPage() {
     }
 
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      
+      // Determine redirect route based on account type
+      const dashboardRoutes = {
+        admin: '/dashboard/admin',
+        seller: '/dashboard/seller',
+        user: '/dashboard/user'
+      };
+      
+      const redirectRoute = dashboardRoutes[result.user.account_type] || '/';
+      
       // Show success message
       await Swal.fire({
         icon: 'success',
@@ -50,7 +67,9 @@ export default function LoginPage() {
         timer: 1500,
         timerProgressBar: true
       });
-      // Redirect will happen automatically via useEffect
+      
+      // Redirect to appropriate dashboard
+      router.push(redirectRoute);
     } catch (error) {
       console.error('Login failed:', error);
       

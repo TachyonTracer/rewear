@@ -10,97 +10,116 @@ export default function Home() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data for demonstration - in production, this would come from your database
+  // Debounce search term
   useEffect(() => {
-    const mockCategories = [
-      'All', 'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Footwear'
-    ];
-    const mockProducts = [
-      {
-        id: 1,
-        name: 'Vintage Denim Jacket',
-        price: '₹1200',
-        image: 'https://placehold.co/400x300/6B8E23/ffffff?text=Denim+Jacket',
-        category: 'Outerwear',
-        description: 'Classic denim jacket, well-preserved and stylish.',
-        seller: 'EcoThreads'
-      },
-      {
-        id: 2,
-        name: 'Floral Summer Dress',
-        price: '₹850',
-        image: 'https://placehold.co/400x300/8FBC8F/ffffff?text=Summer+Dress',
-        category: 'Dresses',
-        description: 'Light and airy floral dress, perfect for summer days.',
-        seller: 'GreenCloset'
-      },
-      {
-        id: 3,
-        name: 'Comfortable Cotton Tee',
-        price: '₹300',
-        image: 'https://placehold.co/400x300/9ACD32/ffffff?text=Cotton+Tee',
-        category: 'Tops',
-        description: 'Soft cotton t-shirt, great for everyday wear.',
-        seller: 'RewearFinds'
-      },
-      {
-        id: 4,
-        name: 'High-Waisted Jeans',
-        price: '₹950',
-        image: 'https://placehold.co/400x300/556B2F/ffffff?text=High-Waisted+Jeans',
-        category: 'Bottoms',
-        description: 'Stylish high-waisted jeans, comfortable fit.',
-        seller: 'SustainableStyle'
-      },
-      {
-        id: 5,
-        name: 'Elegant Silk Scarf',
-        price: '₹400',
-        image: 'https://placehold.co/400x300/2E8B57/ffffff?text=Silk+Scarf',
-        category: 'Accessories',
-        description: 'Luxurious silk scarf, adds a touch of elegance.',
-        seller: 'ChicRecycle'
-      },
-      {
-        id: 6,
-        name: 'Leather Ankle Boots',
-        price: '₹1800',
-        image: 'https://placehold.co/400x300/3CB371/ffffff?text=Ankle+Boots',
-        category: 'Footwear',
-        description: 'Durable leather ankle boots, minimal wear.',
-        seller: 'BootUp'
-      },
-      {
-        id: 7,
-        name: 'Striped Polo Shirt',
-        price: '₹450',
-        image: 'https://placehold.co/400x300/66CDAA/ffffff?text=Polo+Shirt',
-        category: 'Tops',
-        description: 'Classic striped polo, perfect for casual outings.',
-        seller: 'PreLovedPerfection'
-      },
-      {
-        id: 8,
-        name: 'Comfy Lounge Pants',
-        price: '₹600',
-        image: 'https://placehold.co/400x300/32CD32/ffffff?text=Lounge+Pants',
-        category: 'Bottoms',
-        description: 'Soft and comfy lounge pants, ideal for relaxing.',
-        seller: 'RelaxedRewear'
-      },
-    ];
-    setCategories(mockCategories);
-    setProducts(mockProducts);
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/categories');
+        if (response.ok) {
+          const data = await response.json();
+          setCategories(['All', ...data.categories.map(cat => cat.name)]);
+        } else {
+          // Fallback to mock categories
+          setCategories(['All', 'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Footwear']);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        // Fallback to mock categories
+        setCategories(['All', 'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories', 'Footwear']);
+      }
+    };
+
+    fetchCategories();
   }, []);
 
-  // Filtered products based on search term and active category
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = activeCategory === 'All' || product.category === activeCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Fetch products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const params = new URLSearchParams({
+          limit: '20',
+          page: '1'
+        });
+        
+        if (activeCategory !== 'All') {
+          params.append('category', activeCategory);
+        }
+        
+        if (debouncedSearchTerm) {
+          params.append('search', debouncedSearchTerm);
+        }
+
+        const response = await fetch(`/api/products?${params}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch products');
+        }
+        
+        const data = await response.json();
+        
+        if (data.products) {
+          // Format products for display
+          const formattedProducts = data.products.map(product => ({
+            id: product.id,
+            name: product.title,
+            title: product.title,
+            price: `₹${product.price}`,
+            originalPrice: product.original_price ? `₹${product.original_price}` : null,
+            image: product.image_urls && product.image_urls.length > 0 
+              ? product.image_urls[0] 
+              : `https://placehold.co/400x300/6B8E23/ffffff?text=${encodeURIComponent(product.title)}`,
+            category: product.category_name,
+            description: product.description || 'No description available',
+            seller: product.seller_name,
+            condition: product.condition_rating,
+            size: product.size,
+            color: product.color,
+            views: product.views_count,
+            likes: product.likes_count,
+            isNegotiable: product.is_negotiable,
+            createdAt: product.created_at,
+            // Additional display properties
+            isNew: (Date.now() - new Date(product.created_at).getTime()) < (7 * 24 * 60 * 60 * 1000),
+            discount: product.original_price && product.original_price > product.price 
+              ? Math.round(((product.original_price - product.price) / product.original_price) * 100)
+              : null
+          }));
+          
+          setProducts(formattedProducts);
+        } else {
+          setProducts([]);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setError('Failed to load products. Please try again later.');
+        setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, [activeCategory, debouncedSearchTerm]);
+
+  // No need for client-side filtering since API handles it
+  const filteredProducts = products;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 text-gray-800">
@@ -137,6 +156,15 @@ export default function Home() {
                   {user.account_type}
                 </span>
               </div>
+              
+              {/* Dashboard Link */}
+              <Link 
+                href={`/dashboard/${user.account_type}`}
+                className="text-green-700 hover:text-green-900 font-medium transition duration-300 ease-in-out"
+              >
+                Dashboard
+              </Link>
+              
               {(user.account_type === 'seller' || user.account_type === 'admin') && (
                 <button className="text-green-700 hover:text-green-900 font-medium transition duration-300 ease-in-out">
                   Post Item
@@ -248,10 +276,44 @@ export default function Home() {
         {/* Product Listing */}
         <section>
           <h3 className="text-3xl font-bold text-green-800 mb-6 text-center">Featured Items</h3>
-          {filteredProducts.length > 0 ? (
+          
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading products...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <div className="mb-4">
+                <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+              <h4 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Products</h4>
+              <p className="text-gray-600">{error}</p>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="mt-4 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {filteredProducts.map(product => (
-                <div key={product.id} className="bg-white rounded-2xl shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 ease-in-out group">
+                <div key={product.id} className="bg-white rounded-2xl shadow-lg overflow-hidden transform hover:scale-105 transition duration-300 ease-in-out group relative">
+                  {/* New/Discount Badge */}
+                  {product.isNew && (
+                    <div className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium z-10">
+                      New
+                    </div>
+                  )}
+                  {product.discount && (
+                    <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium z-10">
+                      -{product.discount}%
+                    </div>
+                  )}
+                  
                   <Image
                     src={product.image}
                     alt={product.name}
@@ -261,14 +323,95 @@ export default function Home() {
                     unoptimized
                   />
                   <div className="p-5">
-                    <h4 className="text-xl font-semibold text-gray-900 mb-2">{product.name}</h4>
-                    <p className="text-green-600 text-lg font-bold mb-3">{product.price}</p>
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="text-lg font-semibold text-gray-900 line-clamp-2 flex-1">{product.name}</h4>
+                      {product.isNegotiable && (
+                        <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full whitespace-nowrap">
+                          Negotiable
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Price Section */}
+                    <div className="mb-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-600 text-lg font-bold">{product.price}</span>
+                        {product.originalPrice && product.originalPrice !== product.price && (
+                          <span className="text-gray-400 text-sm line-through">{product.originalPrice}</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Product Details */}
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Condition:</span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          product.condition === 'new' ? 'bg-green-100 text-green-800' :
+                          product.condition === 'like_new' ? 'bg-green-100 text-green-800' :
+                          product.condition === 'very_good' ? 'bg-yellow-100 text-yellow-800' :
+                          product.condition === 'good' ? 'bg-yellow-100 text-yellow-800' :
+                          product.condition === 'fair' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {product.condition?.replace(/_/g, ' ') || 'Unknown'}
+                        </span>
+                      </div>
+                      
+                      {product.size && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Size:</span>
+                          <span className="font-medium text-gray-900">{product.size}</span>
+                        </div>
+                      )}
+                      
+                      {product.color && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Color:</span>
+                          <span className="font-medium text-gray-900">{product.color}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">Category:</span>
+                        <span className="font-medium text-gray-900">{product.category}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Description */}
                     <p className="text-gray-600 text-sm mb-4 line-clamp-2">{product.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500 bg-green-50 px-3 py-1 rounded-full">{product.seller}</span>
-                      <button className="bg-green-500 text-white px-5 py-2 rounded-full font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 transition duration-300 ease-in-out">
-                        View Details
-                      </button>
+                    
+                    {/* Stats and Actions */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <div className="flex items-center space-x-3">
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            {product.views || 0}
+                          </span>
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                            </svg>
+                            {product.likes || 0}
+                          </span>
+                        </div>
+                        <span className="text-green-600 font-medium">by {product.seller}</span>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button className="flex-1 bg-green-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 transition duration-300 ease-in-out">
+                          View Details
+                        </button>
+                        <button className="px-3 py-2 border border-green-500 text-green-500 rounded-lg hover:bg-green-50 transition duration-300 ease-in-out">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

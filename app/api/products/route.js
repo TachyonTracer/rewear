@@ -40,7 +40,7 @@ async function handler(request) {
     let paramIndex = 1;
     
     if (category) {
-      queryText += ` AND c.slug = $${paramIndex}`;
+      queryText += ` AND c.name = $${paramIndex}`;
       queryParams.push(category);
       paramIndex++;
     }
@@ -75,7 +75,7 @@ async function handler(request) {
     let countParamIndex = 1;
     
     if (category) {
-      countQuery += ` AND c.slug = $${countParamIndex}`;
+      countQuery += ` AND c.name = $${countParamIndex}`;
       countParams.push(category);
       countParamIndex++;
     }
