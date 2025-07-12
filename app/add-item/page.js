@@ -28,6 +28,11 @@ export default function AddItemPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  // Get the correct dashboard URL based on user type
+  const getDashboardUrl = () => {
+    return user?.account_type === 'admin' ? '/dashboard/admin' : '/dashboard/user';
+  };
+
   useEffect(() => {
     if (!user) {
       router.push('/login');
@@ -97,7 +102,11 @@ export default function AddItemPage() {
       if (data.success) {
         setSuccess(true);
         setTimeout(() => {
-          router.push('/dashboard');
+          // Redirect to appropriate dashboard based on user type
+          const dashboardRoute = user.account_type === 'admin' 
+            ? '/dashboard/admin' 
+            : '/dashboard/user';
+          router.push(dashboardRoute);
         }, 2000);
       } else {
         setError(data.error || 'Failed to create item');
@@ -140,7 +149,7 @@ export default function AddItemPage() {
             ReWear
           </Link>
           <Link
-            href="/dashboard"
+            href={getDashboardUrl()}
             className="text-green-600 hover:text-green-700 flex items-center space-x-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,7 +381,7 @@ export default function AddItemPage() {
             {/* Submit Button */}
             <div className="flex justify-end space-x-4">
               <Link
-                href="/dashboard"
+                href={getDashboardUrl()}
                 className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
