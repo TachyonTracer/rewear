@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyToken } from '../../../../lib/auth';
-import { db } from '../../../../lib/db';
+import { query } from '../../../../lib/db';
 
 export async function GET(request) {
   try {
@@ -11,24 +11,26 @@ export async function GET(request) {
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || decoded.account_type !== 'admin') {
+    if (!decoded || decoded.type !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     // Get admin statistics
-    const [userCount, productCount, orderCount] = await Promise.all([
-      db.query('SELECT COUNT(*) as count FROM users'),
-      db.query('SELECT COUNT(*) as count FROM products'),
-      db.query('SELECT COUNT(*) as count FROM orders WHERE 1=1') // Placeholder for when orders table exists
+    const [userCount, productCount, orderCount, sellersCount] = await Promise.all([
+      query('SELECT COUNT(*) as count FROM users'),
+      query('SELECT COUNT(*) as count FROM products'),
+      query('SELECT COUNT(*) as count FROM orders WHERE 1=1'), // Placeholder for when orders table exists
+      query('SELECT COUNT(DISTINCT seller_id) as count FROM products') // Active sellers (users who have listed products)
     ]);
 
-    // Calculate revenue (placeholder - would need actual orders table)
-    const revenue = 15420; // Mock value for now
+   
+    const revenue = 0; 
 
     const stats = {
       totalUsers: parseInt(userCount.rows[0].count),
       totalProducts: parseInt(productCount.rows[0].count),
       totalOrders: 0, // Will be real when orders table exists
+      activeSellers: parseInt(sellersCount.rows[0].count), // Users who have actually listed products
       revenue: revenue
     };
 

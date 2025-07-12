@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import Swal from 'sweetalert2';
 import { useAuth } from '../../../hooks/useAuth.js';
 import { fetchWithAuth } from '../../../lib/api.js';
 
@@ -16,6 +17,8 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [userStatuses, setUserStatuses] = useState({});
+  const [productStatuses, setProductStatuses] = useState({});
 
   useEffect(() => {
     if (!loading && (!user || user.account_type !== 'admin')) {
@@ -77,18 +80,113 @@ export default function AdminDashboard() {
     }
   };
 
-  const getUserTypeColor = (type) => {
-    switch (type) {
-      case 'admin': return 'bg-purple-100 text-purple-800';
-      case 'seller': return 'bg-blue-100 text-blue-800';
-      case 'user': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: 'You will be logged out of the admin panel',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, logout',
+      cancelButtonText: 'Cancel',
+      customClass: {
+        popup: 'rounded-2xl',
+        confirmButton: 'rounded-lg px-4 py-2',
+        cancelButton: 'rounded-lg px-4 py-2'
+      }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await logout();
+        router.push('/');
+        
+        // Show success message
+        Swal.fire({
+          title: 'Logged out successfully!',
+          text: 'You have been logged out of the admin panel',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false,
+          customClass: {
+            popup: 'rounded-2xl'
+          }
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+        Swal.fire({
+          title: 'Error!',
+          text: 'Something went wrong during logout',
+          icon: 'error',
+          customClass: {
+            popup: 'rounded-2xl'
+          }
+        });
+      }
     }
   };
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/');
+  const toggleUserStatus = async (userId, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+      
+      // Update local state immediately for better UX
+      setUserStatuses(prev => ({
+        ...prev,
+        [userId]: newStatus
+      }));
+
+      // Here you would make an API call to update the user status
+      // const response = await fetchWithAuth(`/api/admin/users/${userId}`, {
+      //   method: 'PATCH',
+      //   body: JSON.stringify({ status: newStatus })
+      // });
+      
+      console.log(`User ${userId} status changed to ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      // Revert the status on error
+      setUserStatuses(prev => ({
+        ...prev,
+        [userId]: currentStatus
+      }));
+    }
+  };
+
+  const getUserStatus = (userId) => {
+    return userStatuses[userId] || 'active';
+  };
+
+  const toggleProductStatus = async (productId, currentStatus) => {
+    try {
+      const newStatus = currentStatus === 'active' ? 'blacklisted' : 'active';
+      
+      // Update local state immediately for better UX
+      setProductStatuses(prev => ({
+        ...prev,
+        [productId]: newStatus
+      }));
+
+      // Here you would make an API call to update the product status
+      // const response = await fetchWithAuth(`/api/admin/products/${productId}`, {
+      //   method: 'PATCH',
+      //   body: JSON.stringify({ status: newStatus })
+      // });
+      
+      console.log(`Product ${productId} status changed to ${newStatus}`);
+    } catch (error) {
+      console.error('Error updating product status:', error);
+      // Revert the status on error
+      setProductStatuses(prev => ({
+        ...prev,
+        [productId]: currentStatus
+      }));
+    }
+  };
+
+  const getProductStatus = (productId) => {
+    return productStatuses[productId] || 'active';
   };
 
   return (
@@ -167,9 +265,9 @@ export default function AdminDashboard() {
 
         {/* Content - only show when not loading and no error */}
         {!dataLoading && !error && (
-          <>
+          <div className="space-y-8">
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -177,62 +275,62 @@ export default function AdminDashboard() {
                     <p className="text-2xl font-bold text-gray-900">{stats.totalUsers || 0}</p>
                     <p className="text-sm text-green-600">+12.5%</p>
                   </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Active Sellers</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.activeSellers || 0}</p>
+                    <p className="text-sm text-green-600">Users with listings</p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Products</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.totalProducts || 0}</p>
+                    <p className="text-sm text-green-600">+25 today</p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Revenue</p>
+                    <p className="text-2xl font-bold text-gray-900">₹{stats.revenue || 0}</p>
+                    <p className="text-sm text-green-600">+12.5%</p>
+                  </div>
+                  <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Sellers</p>
-                <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.account_type === 'seller').length}</p>
-                <p className="text-sm text-green-600">+8 this week</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Products</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalProducts || 0}</p>
-                <p className="text-sm text-green-600">+25 today</p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">₹{stats.revenue || 0}</p>
-                <p className="text-sm text-green-600">+12.5%</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Navigation Tabs */}
-        <div className="bg-white rounded-2xl shadow-sm border border-green-200 mb-8">
+            {/* Navigation Tabs */}
+            <div className="bg-white rounded-2xl shadow-sm border border-green-200">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6" aria-label="Tabs">
               <button
@@ -357,9 +455,6 @@ export default function AdminDashboard() {
                           User
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Type
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Status
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -373,42 +468,46 @@ export default function AdminDashboard() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {users.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                          <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
                             No users found.
                           </td>
                         </tr>
                       ) : (
-                        users.map((user) => (
-                          <tr key={user.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                                <div className="text-sm text-gray-500">{user.email}</div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getUserTypeColor(user.account_type)}`}>
-                                {user.account_type}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor('Active')}`}>
-                                Active
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {new Date(user.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <button className="text-green-600 hover:text-green-900 mr-3">
-                                Edit
-                              </button>
-                              <button className="text-red-600 hover:text-red-900">
-                                Suspend
-                              </button>
-                            </td>
-                          </tr>
-                        ))
+                        users.map((user) => {
+                          const userStatus = getUserStatus(user.id);
+                          return (
+                            <tr key={user.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                  <div className="text-sm text-gray-500">{user.email}</div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                  userStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {userStatus === 'active' ? 'Active' : 'Suspended'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(user.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button
+                                  onClick={() => toggleUserStatus(user.id, userStatus)}
+                                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                                    userStatus === 'active'
+                                      ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                      : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                  }`}
+                                >
+                                  {userStatus === 'active' ? 'Suspend' : 'Activate'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -422,17 +521,15 @@ export default function AdminDashboard() {
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-bold text-gray-900">Product Management</h2>
                   <div className="flex space-x-2">
-                    <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
-                      <option>All Categories</option>
-                      <option>Jackets</option>
-                      <option>Dresses</option>
-                      <option>T-Shirts</option>
-                    </select>
+                    <input
+                      type="text"
+                      placeholder="Search products..."
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                    />
                     <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
                       <option>All Status</option>
                       <option>Active</option>
-                      <option>Pending Review</option>
-                      <option>Rejected</option>
+                      <option>Blacklisted</option>
                     </select>
                   </div>
                 </div>
@@ -448,37 +545,98 @@ export default function AdminDashboard() {
                     <p className="text-gray-600">Products will appear here as sellers add them.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {products.map((product) => (
-                      <div key={product.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                        <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-4">
-                          <Image
-                            src={product.image_url || 'https://placehold.co/150x150/9ACD32/ffffff?text=Product'}
-                            alt={product.name}
-                            width={150}
-                            height={150}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
-                        <p className="text-sm text-gray-600 mb-2">by {product.seller_name}</p>
-                        <p className="text-lg font-bold text-green-600 mb-2">₹{product.price}</p>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Active
-                          </span>
-                          <span className="text-xs text-gray-500">{new Date(product.created_at).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex space-x-2">
-                          <button className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
-                            View Details
-                          </button>
-                          <button className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Product
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Seller
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Price
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Condition
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Listed Date
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {products.map((product) => {
+                          const productStatus = getProductStatus(product.id);
+                          return (
+                            <tr key={product.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="flex-shrink-0 h-16 w-16">
+                                    <Image
+                                      src={product.image_urls?.[0] || 'https://placehold.co/64x64/9ACD32/ffffff?text=Product'}
+                                      alt={product.title}
+                                      width={64}
+                                      height={64}
+                                      className="h-16 w-16 rounded-lg object-cover"
+                                    />
+                                  </div>
+                                  <div className="ml-4">
+                                    <div className="text-sm font-medium text-gray-900">{product.title}</div>
+                                    <div className="text-sm text-gray-500 max-w-xs truncate">
+                                      {product.description}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{product.seller_name}</div>
+                                <div className="text-sm text-gray-500">{product.seller_email}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">₹{product.price}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                                  {product.condition_rating?.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                                  productStatus === 'active' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {productStatus === 'active' ? 'Active' : 'Blacklisted'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(product.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button
+                                  onClick={() => toggleProductStatus(product.id, productStatus)}
+                                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                                    productStatus === 'active'
+                                      ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                      : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                  }`}
+                                >
+                                  {productStatus === 'active' ? 'Blacklist' : 'Unblacklist'}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
@@ -547,9 +705,10 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
-          </>
-        )}
+          </div>
         </div>
+          </div>
+        )}
       </div>
     </div>
   );

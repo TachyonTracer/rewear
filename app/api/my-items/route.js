@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server';
-import { Pool } from 'pg';
+import { query } from '../../../lib/db';
 import jwt from 'jsonwebtoken';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
+
 
 export async function GET(request) {
   try {
@@ -35,7 +30,7 @@ export async function GET(request) {
     const userId = decoded.userId;
     
     // Fetch user's uploaded items from database
-    const query = `
+    const queryText = `
       SELECT 
         p.id,
         p.title,
@@ -53,7 +48,7 @@ export async function GET(request) {
       ORDER BY p.created_at DESC
     `;
 
-    const result = await pool.query(query, [userId]);
+    const result = await query(queryText, [userId]);
     
     // Format the products for frontend
     const formattedItems = result.rows.map(item => ({

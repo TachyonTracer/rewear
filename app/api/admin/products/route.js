@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyToken } from '../../../../lib/auth';
-import { db } from '../../../../lib/db';
+import { query } from '../../../../lib/db';
 
 export async function GET(request) {
   try {
@@ -11,20 +11,21 @@ export async function GET(request) {
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || decoded.account_type !== 'admin') {
+    if (!decoded || decoded.type !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     // Get all products with seller information
-    const products = await db.query(`
+    const products = await query(`
       SELECT 
         p.id,
-        p.name,
+        p.title,
         p.description,
         p.price,
-        p.image_url,
-        p.category,
-        p.condition,
+        p.image_urls,
+        p.category_id,
+        p.condition_rating,
+        p.status,
         p.created_at,
         u.name as seller_name,
         u.email as seller_email

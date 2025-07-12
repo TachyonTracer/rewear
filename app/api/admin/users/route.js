@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyToken } from '../../../../lib/auth';
-import { db } from '../../../../lib/db';
+import { query } from '../../../../lib/db';
 
 export async function GET(request) {
   try {
@@ -11,17 +11,17 @@ export async function GET(request) {
     }
 
     const decoded = verifyToken(token);
-    if (!decoded || decoded.account_type !== 'admin') {
+    if (!decoded || decoded.type !== 'admin') {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     // Get all users with their details
-    const users = await db.query(`
+    const users = await query(`
       SELECT 
         id,
         name,
         email,
-        account_type,
+        type,
         created_at,
         updated_at
       FROM users 
