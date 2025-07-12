@@ -24,15 +24,22 @@ export default function RegisterPage() {
   const [passwordMatch, setPasswordMatch] = useState(true);
   const [agreeTerms, setAgreeTerms] = useState(false);
   
-  const { register, loading, error, isAuthenticated, clearError } = useAuth();
+  const { register, loading, error, isAuthenticated, user, clearError } = useAuth();
   const router = useRouter();
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated to appropriate dashboard
   useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/');
+    if (isAuthenticated && user) {
+      const dashboardRoutes = {
+        admin: '/dashboard/admin',
+        seller: '/dashboard/seller',
+        user: '/dashboard/user'
+      };
+      
+      const route = dashboardRoutes[user.account_type] || '/';
+      router.push(route);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user, router]);
 
   // Clear error when component unmounts
   useEffect(() => {
@@ -103,7 +110,16 @@ export default function RegisterPage() {
     try {
       // Remove confirmPassword from the data sent to API
       const { confirmPassword, ...registrationData } = formData;
-      await register(registrationData);
+      const result = await register(registrationData);
+      
+      // Determine redirect route based on account type
+      const dashboardRoutes = {
+        admin: '/dashboard/admin',
+        seller: '/dashboard/seller',
+        user: '/dashboard/user'
+      };
+      
+      const redirectRoute = dashboardRoutes[result.user.account_type] || '/';
       
       // Show success message
       await Swal.fire({
@@ -115,7 +131,9 @@ export default function RegisterPage() {
         timer: 2000,
         timerProgressBar: true
       });
-      // Redirect will happen automatically via useEffect
+      
+      // Redirect to appropriate dashboard
+      router.push(redirectRoute);
     } catch (error) {
       console.error('Registration failed:', error);
       
