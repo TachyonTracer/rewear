@@ -4,6 +4,14 @@
 
 # Team Leader Email : priyanshpankhaniya@gmail.com
 
+# Our Site is Deployed at Vercel
+
+
+# Auth Credientials
+
+## Admin - Email : Alpha@123 , Password : Alpha@123
+## User - Email :Beta@123 , Password : Beta@123
+
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 

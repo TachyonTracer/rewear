@@ -126,12 +126,12 @@ async function handler(request) {
 export const GET = withOptionalAuth(handler);
 
 // POST handler for creating new products
-export async function POST(request) {
+import { withAuth } from '../../../lib/middleware.js';
+
+async function handlePOST(request) {
   try {
     const body = await request.json();
     
-    // For now, we'll create products without authentication
-    // In a real app, you'd require authentication
     const {
       title,
       description,
@@ -154,9 +154,7 @@ export async function POST(request) {
       );
     }
 
-    // For demo purposes, use a default seller_id
-    // In a real app, you'd get this from the authenticated user
-    const seller_id = 1; // Using the first user as default seller
+    const seller_id = request.user.id;
 
     const insertQuery = `
       INSERT INTO products (
@@ -182,11 +180,31 @@ export async function POST(request) {
     ];
 
     const result = await query(insertQuery, values);
+    const product = result.rows[0];
+    
+    // Award points for product upload
+    try {
+      await fetch(`${request.url.split('/api')[0]}/api/points/earn`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': request.headers.get('Authorization') || request.headers.get('authorization')
+        },
+        body: JSON.stringify({
+          action: 'product_upload',
+          referenceId: product.id,
+          referenceType: 'product'
+        })
+      });
+    } catch (pointsError) {
+      console.error('Error awarding points:', pointsError);
+      // Don't fail product creation if points awarding fails
+    }
     
     return NextResponse.json({
       success: true,
-      message: 'Product created successfully',
-      product: result.rows[0]
+      message: 'Product created successfully! You earned 10 points.',
+      product: product
     }, { status: 201 });
 
   } catch (error) {
@@ -197,3 +215,5 @@ export async function POST(request) {
     );
   }
 }
+
+export const POST = withAuth(handlePOST);
