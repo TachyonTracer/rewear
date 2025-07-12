@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../hooks/useAuth.js";
-
+import AboutPage from '../components/about.js';
+import ContactForm  from '../components/contact.js';
 export default function Home() {
   const { user, logout } = useAuth();
   const [products, setProducts] = useState([]);
@@ -447,6 +448,9 @@ export default function Home() {
             </div>
           )}
         </section>
+        <AboutPage />
+        <ContactForm />
+        
       </main>
 
       {/* Footer */}

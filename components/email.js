@@ -9,12 +9,13 @@ export default function ContactForm() {
   const sendEmail = (e) => {
     e.preventDefault();
 
-    emailjs.sendForm(
-      'service_zwz6dwq',      // from EmailJS dashboard
-      'template_5nq47o8',     // your email template id
-      form.current,           // form reference
-      'is3iCABwsinPZZbCK'       // your EmailJS public key
-    )
+   emailjs.sendForm(
+  process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
+  process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID,
+  form.current,
+  process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY
+)
+
     .then((result) => {
       alert('Email sent successfully!');
       console.log(result.text);
