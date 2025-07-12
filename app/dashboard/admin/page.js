@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '../../../hooks/useAuth.js';
+import { fetchWithAuth } from '../../../lib/api.js';
 
 export default function AdminDashboard() {
   const { user, logout, loading } = useAuth();
@@ -13,6 +14,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({});
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!loading && (!user || user.account_type !== 'admin')) {
@@ -20,73 +23,35 @@ export default function AdminDashboard() {
     }
   }, [user, loading, router]);
 
-  // Mock data for admin overview
+  // Fetch admin data from API
   useEffect(() => {
-    const mockStats = {
-      totalUsers: 1250,
-      totalSellers: 85,
-      totalProducts: 340,
-      totalOrders: 125,
-      revenue: '₹45,600',
-      growth: '+12.5%'
-    };
-    setStats(mockStats);
+    if (!loading && user && user.account_type === 'admin') {
+      fetchAdminData();
+    }
+  }, [user, loading]);
 
-    const mockUsers = [
-      {
-        id: 1,
-        name: 'John Doe',
-        email: 'john@example.com',
-        type: 'user',
-        status: 'Active',
-        joinDate: '2025-01-10',
-        orders: 5
-      },
-      {
-        id: 2,
-        name: 'Jane Smith',
-        email: 'jane@example.com',
-        type: 'seller',
-        status: 'Active',
-        joinDate: '2025-01-08',
-        listings: 12
-      },
-      {
-        id: 3,
-        name: 'Bob Wilson',
-        email: 'bob@example.com',
-        type: 'user',
-        status: 'Suspended',
-        joinDate: '2025-01-05',
-        orders: 2
-      }
-    ];
-    setUsers(mockUsers);
+  const fetchAdminData = async () => {
+    setDataLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch admin data in parallel
+      const [statsRes, usersRes, productsRes] = await Promise.all([
+        fetchWithAuth('/api/admin/stats'),
+        fetchWithAuth('/api/admin/users'),
+        fetchWithAuth('/api/admin/products')
+      ]);
 
-    const mockProducts = [
-      {
-        id: 1,
-        title: 'Vintage Denim Jacket',
-        seller: 'Jane Smith',
-        price: '₹1,200',
-        status: 'Active',
-        category: 'Jackets',
-        image: 'https://placehold.co/100x100/6B8E23/ffffff?text=Denim',
-        dateAdded: '2025-01-08'
-      },
-      {
-        id: 2,
-        title: 'Summer Floral Dress',
-        seller: 'Sarah Johnson',
-        price: '₹650',
-        status: 'Pending Review',
-        category: 'Dresses',
-        image: 'https://placehold.co/100x100/8FBC8F/ffffff?text=Dress',
-        dateAdded: '2025-01-10'
-      }
-    ];
-    setProducts(mockProducts);
-  }, []);
+      setStats(statsRes.stats || {});
+      setUsers(usersRes.users || []);
+      setProducts(productsRes.products || []);
+    } catch (error) {
+      console.error('Error fetching admin data:', error);
+      setError('Failed to load admin data. Please try again.');
+    } finally {
+      setDataLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -174,15 +139,44 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
-                <p className="text-sm text-green-600">{stats.growth}</p>
-              </div>
+        {/* Loading State */}
+        {dataLoading && (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading admin data...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-red-700">{error}</p>
+              <button 
+                onClick={fetchAdminData}
+                className="ml-auto text-red-600 hover:text-red-800 font-medium"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Content - only show when not loading and no error */}
+        {!dataLoading && !error && (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Total Users</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.totalUsers || 0}</p>
+                    <p className="text-sm text-green-600">+12.5%</p>
+                  </div>
               <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
@@ -195,7 +189,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Sellers</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalSellers}</p>
+                <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.account_type === 'seller').length}</p>
                 <p className="text-sm text-green-600">+8 this week</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
@@ -210,7 +204,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Products</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalProducts}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalProducts || 0}</p>
                 <p className="text-sm text-green-600">+25 today</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
@@ -224,9 +218,9 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Platform Revenue</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.revenue}</p>
-                <p className="text-sm text-green-600">This month</p>
+                <p className="text-sm font-medium text-gray-600">Revenue</p>
+                <p className="text-2xl font-bold text-gray-900">₹{stats.revenue || 0}</p>
+                <p className="text-sm text-green-600">+12.5%</p>
               </div>
               <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -377,37 +371,45 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {users.map((user) => (
-                        <tr key={user.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                              <div className="text-sm text-gray-500">{user.email}</div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getUserTypeColor(user.type)}`}>
-                              {user.type}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user.status)}`}>
-                              {user.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {user.joinDate}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button className="text-green-600 hover:text-green-900 mr-3">
-                              Edit
-                            </button>
-                            <button className="text-red-600 hover:text-red-900">
-                              Suspend
-                            </button>
+                      {users.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                            No users found.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        users.map((user) => (
+                          <tr key={user.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                <div className="text-sm text-gray-500">{user.email}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getUserTypeColor(user.account_type)}`}>
+                                {user.account_type}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor('Active')}`}>
+                                Active
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(user.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button className="text-green-600 hover:text-green-900 mr-3">
+                                Edit
+                              </button>
+                              <button className="text-red-600 hover:text-red-900">
+                                Suspend
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -435,38 +437,50 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {products.map((product) => (
-                    <div key={product.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-4">
-                        <Image
-                          src={product.image}
-                          alt={product.title}
-                          width={150}
-                          height={150}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <h3 className="font-medium text-gray-900 mb-1">{product.title}</h3>
-                      <p className="text-sm text-gray-600 mb-2">by {product.seller}</p>
-                      <p className="text-lg font-bold text-green-600 mb-2">{product.price}</p>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(product.status)}`}>
-                          {product.status}
-                        </span>
-                        <span className="text-xs text-gray-500">{product.dateAdded}</span>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
-                          Approve
-                        </button>
-                        <button className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
-                          Reject
-                        </button>
-                      </div>
+                {products.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
                     </div>
-                  ))}
-                </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+                    <p className="text-gray-600">Products will appear here as sellers add them.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {products.map((product) => (
+                      <div key={product.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-4">
+                          <Image
+                            src={product.image_url || 'https://placehold.co/150x150/9ACD32/ffffff?text=Product'}
+                            alt={product.name}
+                            width={150}
+                            height={150}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
+                        <p className="text-sm text-gray-600 mb-2">by {product.seller_name}</p>
+                        <p className="text-lg font-bold text-green-600 mb-2">₹{product.price}</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Active
+                          </span>
+                          <span className="text-xs text-gray-500">{new Date(product.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
+                            View Details
+                          </button>
+                          <button className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -533,7 +547,8 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
-          </div>
+          </>
+        )}
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@ const pool = new Pool({
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params; // Await params in Next.js 15
     
     if (!id) {
       return NextResponse.json(
@@ -36,13 +36,10 @@ export async function GET(request, { params }) {
         p.updated_at,
         c.name as category_name,
         c.id as category_id,
-        u.name as seller_name,
-        u.id as seller_id,
-        u.role as seller_role
+        p.seller_id
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN users u ON p.seller_id = u.id
-      WHERE p.id = $1 AND p.status = 'available'
+      WHERE p.id = $1
     `;
 
     const result = await pool.query(query, [id]);
@@ -71,9 +68,7 @@ export async function GET(request, { params }) {
       is_negotiable: product.is_negotiable || false,
       category_name: product.category_name,
       category_id: product.category_id,
-      seller_name: product.seller_name,
       seller_id: product.seller_id,
-      seller_role: product.seller_role,
       created_at: product.created_at,
       updated_at: product.updated_at
     };

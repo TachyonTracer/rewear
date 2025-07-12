@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '../../../hooks/useAuth.js';
+import { fetchWithAuth } from '../../../lib/api.js';
 
 export default function UserDashboard() {
   const { user, logout, loading } = useAuth();
@@ -15,6 +16,8 @@ export default function UserDashboard() {
   const [uploadedItems, setUploadedItems] = useState([]);
   const [swaps, setSwaps] = useState([]);
   const [points, setPoints] = useState(250); // Mock points balance
+  const [dataLoading, setDataLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!loading && (!user || user.account_type !== 'user')) {
@@ -22,89 +25,35 @@ export default function UserDashboard() {
     }
   }, [user, loading, router]);
 
-  // Mock data for user orders
+  // Fetch user data from API
   useEffect(() => {
-    const mockOrders = [
-      {
-        id: 1,
-        orderNumber: 'ORD-001',
-        date: '2025-01-10',
-        total: '₹1,550',
-        status: 'Delivered',
-        items: 2,
-        image: 'https://placehold.co/100x100/6B8E23/ffffff?text=Denim'
-      },
-      {
-        id: 2,
-        orderNumber: 'ORD-002',
-        date: '2025-01-08',
-        total: '₹850',
-        status: 'In Transit',
-        items: 1,
-        image: 'https://placehold.co/100x100/8FBC8F/ffffff?text=Dress'
-      },
-      {
-        id: 3,
-        orderNumber: 'ORD-003',
-        date: '2025-01-05',
-        total: '₹300',
-        status: 'Processing',
-        items: 1,
-        image: 'https://placehold.co/100x100/9ACD32/ffffff?text=Tee'
-      }
-    ];
-    setOrders(mockOrders);
+    if (!loading && user) {
+      fetchUserData();
+    }
+  }, [user, loading]);
 
-    // Mock uploaded items
-    const mockUploadedItems = [
-      {
-        id: 1,
-        title: 'Vintage Denim Jacket',
-        category: 'Jackets',
-        price: '₹1,200',
-        condition: 'Very Good',
-        status: 'Available',
-        views: 45,
-        likes: 12,
-        image: 'https://placehold.co/100x100/4169E1/ffffff?text=Jacket'
-      },
-      {
-        id: 2,
-        title: 'Cotton Summer Dress',
-        category: 'Dresses',
-        price: '₹800',
-        condition: 'Good',
-        status: 'Available',
-        views: 23,
-        likes: 8,
-        image: 'https://placehold.co/100x100/FFB6C1/ffffff?text=Dress'
-      }
-    ];
-    setUploadedItems(mockUploadedItems);
+  const fetchUserData = async () => {
+    setDataLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch orders, uploaded items, and swaps in parallel
+      const [ordersRes, itemsRes, swapsRes] = await Promise.all([
+        fetchWithAuth('/api/orders'),
+        fetchWithAuth('/api/my-items'),
+        fetchWithAuth('/api/swaps')
+      ]);
 
-    // Mock swaps
-    const mockSwaps = [
-      {
-        id: 1,
-        itemOffered: 'Blue Jeans',
-        itemRequested: 'Black Hoodie',
-        otherUser: 'Sarah M.',
-        status: 'Pending',
-        date: '2025-01-12',
-        type: 'outgoing'
-      },
-      {
-        id: 2,
-        itemOffered: 'White Sneakers',
-        itemRequested: 'Red Dress',
-        otherUser: 'Mike K.',
-        status: 'Completed',
-        date: '2025-01-08',
-        type: 'incoming'
-      }
-    ];
-    setSwaps(mockSwaps);
-  }, []);
+      setOrders(ordersRes.orders || []);
+      setUploadedItems(itemsRes.items || []);
+      setSwaps(swapsRes.swaps || []);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      setError('Failed to load data. Please try again.');
+    } finally {
+      setDataLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -260,8 +209,37 @@ export default function UserDashboard() {
 
           {/* Tab Content */}
           <div className="p-6">
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
+            {/* Error Message */}
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {error}
+                </div>
+                <button
+                  onClick={fetchUserData}
+                  className="mt-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Loading State */}
+            {dataLoading && (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading your data...</p>
+              </div>
+            )}
+
+            {/* Tab Content (only show when not loading) */}
+            {!dataLoading && (
+              <>
+                {/* Overview Tab */}
+                {activeTab === 'overview' && (
               <div className="space-y-6">
                 <h2 className="text-xl font-bold text-gray-900">Dashboard Overview</h2>
                 
@@ -732,6 +710,8 @@ export default function UserDashboard() {
                   </div>
                 </div>
               </div>
+            )}
+              </>
             )}
           </div>
         </div>

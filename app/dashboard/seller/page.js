@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '../../../hooks/useAuth.js';
+import { fetchWithAuth } from '../../../lib/api.js';
 
 export default function SellerDashboard() {
   const { user, logout, loading } = useAuth();
@@ -12,6 +13,8 @@ export default function SellerDashboard() {
   const [activeTab, setActiveTab] = useState('listings');
   const [listings, setListings] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!loading && (!user || user.account_type !== 'seller')) {
@@ -19,63 +22,33 @@ export default function SellerDashboard() {
     }
   }, [user, loading, router]);
 
-  // Mock data for seller listings
+  // Fetch seller data from API
   useEffect(() => {
-    const mockListings = [
-      {
-        id: 1,
-        title: 'Vintage Denim Jacket',
-        price: '₹1,200',
-        status: 'Active',
-        views: 45,
-        image: 'https://placehold.co/150x150/6B8E23/ffffff?text=Denim',
-        dateAdded: '2025-01-08'
-      },
-      {
-        id: 2,
-        title: 'Summer Floral Dress',
-        price: '₹650',
-        status: 'Sold',
-        views: 32,
-        image: 'https://placehold.co/150x150/8FBC8F/ffffff?text=Dress',
-        dateAdded: '2025-01-06'
-      },
-      {
-        id: 3,
-        title: 'Cotton White T-Shirt',
-        price: '₹300',
-        status: 'Active',
-        views: 18,
-        image: 'https://placehold.co/150x150/9ACD32/ffffff?text=Tee',
-        dateAdded: '2025-01-10'
-      }
-    ];
-    setListings(mockListings);
+    if (!loading && user) {
+      fetchSellerData();
+    }
+  }, [user, loading]);
 
-    const mockOrders = [
-      {
-        id: 1,
-        orderNumber: 'ORD-001',
-        buyer: 'John Doe',
-        item: 'Summer Floral Dress',
-        total: '₹650',
-        status: 'Processing',
-        date: '2025-01-10',
-        image: 'https://placehold.co/100x100/8FBC8F/ffffff?text=Dress'
-      },
-      {
-        id: 2,
-        orderNumber: 'ORD-002',
-        buyer: 'Jane Smith',
-        item: 'Vintage Denim Jacket',
-        total: '₹1,200',
-        status: 'Shipped',
-        date: '2025-01-08',
-        image: 'https://placehold.co/100x100/6B8E23/ffffff?text=Denim'
-      }
-    ];
-    setOrders(mockOrders);
-  }, []);
+  const fetchSellerData = async () => {
+    setDataLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch listings and orders in parallel
+      const [listingsRes, ordersRes] = await Promise.all([
+        fetchWithAuth('/api/my-items'), // Use same endpoint for listings
+        fetchWithAuth('/api/seller-orders')
+      ]);
+
+      setListings(listingsRes.items || []);
+      setOrders(ordersRes.orders || []);
+    } catch (error) {
+      console.error('Error fetching seller data:', error);
+      setError('Failed to load data. Please try again.');
+    } finally {
+      setDataLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -261,152 +234,211 @@ export default function SellerDashboard() {
 
           {/* Tab Content */}
           <div className="p-6">
-            {/* Listings Tab */}
-            {activeTab === 'listings' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold text-gray-900">My Listings</h2>
-                  <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
-                    Add New Item
+            {/* Loading State */}
+            {dataLoading && (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
+                <p className="mt-2 text-gray-600">Loading your data...</p>
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-red-700">{error}</p>
+                  <button 
+                    onClick={fetchSellerData}
+                    className="ml-auto text-red-600 hover:text-red-800 font-medium"
+                  >
+                    Try Again
                   </button>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {listings.map((item) => (
-                    <div key={item.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-4">
-                        <Image
-                          src={item.image}
-                          alt={item.title}
-                          width={150}
-                          height={150}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <h3 className="font-medium text-gray-900 mb-2">{item.title}</h3>
-                      <p className="text-lg font-bold text-green-600 mb-2">{item.price}</p>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                          {item.status}
-                        </span>
-                        <span className="text-sm text-gray-600">{item.views} views</span>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
-                          Edit
-                        </button>
-                        <button className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 
-            {/* Orders Tab */}
-            {activeTab === 'orders' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold text-gray-900">Recent Orders</h2>
-                
-                <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div key={order.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden">
-                            <Image
-                              src={order.image}
-                              alt={order.item}
-                              width={48}
-                              height={48}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div>
-                            <h3 className="font-medium text-gray-900">{order.orderNumber}</h3>
-                            <p className="text-sm text-gray-600">{order.buyer}</p>
-                          </div>
+            {/* Content - only show when not loading */}
+            {!dataLoading && !error && (
+              <>
+                {/* Listings Tab */}
+                {activeTab === 'listings' && (
+                  <div className="space-y-6">
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-xl font-bold text-gray-900">My Listings</h2>
+                      <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                        Add New Item
+                      </button>
+                    </div>
+                    
+                    {listings.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-green-600">{order.total}</p>
-                          <p className="text-sm text-gray-600">{order.date}</p>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No listings yet</h3>
+                        <p className="text-gray-600">Start selling by adding your first item!</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {listings.map((item) => (
+                          <div key={item.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="aspect-square bg-gray-200 rounded-lg overflow-hidden mb-4">
+                              <Image
+                                src={item.image_url || item.image || 'https://placehold.co/150x150/9ACD32/ffffff?text=Item'}
+                                alt={item.title || item.name || 'Product'}
+                                width={150}
+                                height={150}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <h3 className="font-medium text-gray-900 mb-2">{item.title || item.name}</h3>
+                            <p className="text-lg font-bold text-green-600 mb-2">₹{item.price}</p>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status || 'Active')}`}>
+                                {item.status || 'Active'}
+                              </span>
+                              <span className="text-sm text-gray-600">{item.views || 0} views</span>
+                            </div>
+                            <div className="flex space-x-2">
+                              <button className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
+                                Edit
+                              </button>
+                              <button className="flex-1 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Orders Tab */}
+                {activeTab === 'orders' && (
+                  <div className="space-y-6">
+                    <h2 className="text-xl font-bold text-gray-900">Recent Orders</h2>
+                    
+                    {orders.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l-1 12H6L5 9z" />
+                          </svg>
                         </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No orders yet</h3>
+                        <p className="text-gray-600">Orders will appear here when customers purchase your items.</p>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
-                        <button className="text-green-600 hover:text-green-700 font-medium text-sm">
-                          View Details
-                        </button>
+                    ) : (
+                      <div className="space-y-4">
+                        {orders.map((order) => (
+                          <div key={order.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-3">
+                                <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden">
+                                  <Image
+                                    src={order.image_url || order.image || 'https://placehold.co/48x48/9ACD32/ffffff?text=Item'}
+                                    alt={order.item || order.product_name || 'Order'}
+                                    width={48}
+                                    height={48}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div>
+                                  <h3 className="font-medium text-gray-900">{order.orderNumber || `Order #${order.id}`}</h3>
+                                  <p className="text-sm text-gray-600">{order.buyer || order.buyer_name}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-green-600">₹{order.total || order.amount}</p>
+                                <p className="text-sm text-gray-600">{order.date || new Date(order.created_at).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                                {order.status}
+                              </span>
+                              <button className="text-green-600 hover:text-green-700 font-medium text-sm">
+                                View Details
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Analytics Tab */}
-            {activeTab === 'analytics' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold text-gray-900">Store Analytics</h2>
-                
-                <div className="bg-gray-50 rounded-lg p-8 text-center">
-                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
+                    )}
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics Coming Soon</h3>
-                  <p className="text-gray-600">
-                    Get detailed insights about your store performance, customer behavior, and sales trends.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Settings Tab */}
-            {activeTab === 'settings' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold text-gray-900">Store Settings</h2>
-                
-                <div className="space-y-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 mb-2">Store Information</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Manage your store details and public profile
-                    </p>
-                    <div className="space-y-3">
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Edit Store Profile
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Shipping Settings
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 mb-2">Payment Settings</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Configure how you receive payments
-                    </p>
-                    <div className="space-y-3">
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Payment Methods
-                      </button>
-                      <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
-                        Tax Settings
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                )}
+              </>
             )}
           </div>
         </div>
+
+        {/* Analytics Tab */}
+        {!dataLoading && !error && activeTab === 'analytics' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-gray-900">Store Analytics</h2>
+              
+              <div className="bg-gray-50 rounded-lg p-8 text-center">
+                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics Coming Soon</h3>
+                <p className="text-gray-600">
+                  Get detailed insights about your store performance, customer behavior, and sales trends.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {!dataLoading && !error && activeTab === 'settings' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-green-200 p-6">
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold text-gray-900">Store Settings</h2>
+              
+              <div className="space-y-6">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-900 mb-2">Store Information</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Manage your store details and public profile
+                  </p>
+                  <div className="space-y-3">
+                    <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                      Edit Store Profile
+                    </button>
+                    <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                      Shipping Settings
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-900 mb-2">Payment Settings</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Configure how you receive payments
+                  </p>
+                  <div className="space-y-3">
+                    <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                      Payment Methods
+                    </button>
+                    <button className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                      Tax Settings
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
