@@ -14,34 +14,30 @@ CREATE TABLE users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL,
     phone VARCHAR(20),
     profile_image VARCHAR(255),
-    bio TEXT,
-    address_line1 VARCHAR(255),
-    address_line2 VARCHAR(255),
+    address VARCHAR(255),
     city VARCHAR(100),
     state VARCHAR(100),
-    zip_code VARCHAR(20),
-    country VARCHAR(100) DEFAULT 'United States',
+    type ENUM('admin', 'user', 'seller') NOT NULL,
     is_verified BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Categories table
-CREATE TABLE categories (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
-    slug VARCHAR(100) UNIQUE NOT NULL,
-    description TEXT,
-    parent_id INT,
-    image_url VARCHAR(255),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_id) REFERENCES categories(id)
-);
+-- CREATE TABLE categories (
+--     id INT PRIMARY KEY AUTO_INCREMENT,
+--     name VARCHAR(100) NOT NULL,
+--     slug VARCHAR(100) UNIQUE NOT NULL,
+--     description TEXT,
+--     parent_id INT,
+--     image_url VARCHAR(255),
+--     is_active BOOLEAN DEFAULT TRUE,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (parent_id) REFERENCES categories(id)
+-- );
 
 -- Brands table
 CREATE TABLE brands (
@@ -69,41 +65,37 @@ CREATE TABLE products (
     price DECIMAL(10, 2) NOT NULL,
     is_negotiable BOOLEAN DEFAULT FALSE,
     status ENUM('active', 'sold', 'pending', 'removed') DEFAULT 'active',
-    views_count INT DEFAULT 0,
-    likes_count INT DEFAULT 0,
-    shipping_cost DECIMAL(10, 2) DEFAULT 0,
-    free_shipping BOOLEAN DEFAULT FALSE,
-    weight_grams INT,
     measurements TEXT, -- JSON string for detailed measurements
     tags TEXT, -- JSON array of tags
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    image_url TEXT[],
     FOREIGN KEY (seller_id) REFERENCES users(id),
     FOREIGN KEY (category_id) REFERENCES categories(id),
     FOREIGN KEY (brand_id) REFERENCES brands(id)
 );
 
 -- Product images table
-CREATE TABLE product_images (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    product_id INT NOT NULL,
-    image_url VARCHAR(255) NOT NULL,
-    is_primary BOOLEAN DEFAULT FALSE,
-    sort_order INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
-);
+-- CREATE TABLE product_images (
+--     id INT PRIMARY KEY AUTO_INCREMENT,
+--     product_id INT NOT NULL,
+--     image_url VARCHAR(255) NOT NULL,
+--     is_primary BOOLEAN DEFAULT FALSE,
+--     sort_order INT DEFAULT 0,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+-- );
 
 -- User favorites/likes table
-CREATE TABLE user_favorites (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT NOT NULL,
-    product_id INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (product_id) REFERENCES products(id),
-    UNIQUE KEY unique_favorite (user_id, product_id)
-);
+-- CREATE TABLE user_favorites (
+--     id INT PRIMARY KEY AUTO_INCREMENT,
+--     user_id INT NOT NULL,
+--     product_id INT NOT NULL,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(id),
+--     FOREIGN KEY (product_id) REFERENCES products(id),
+--     UNIQUE KEY unique_favorite (user_id, product_id)
+-- );
 
 -- Messages table for buyer-seller communication
 CREATE TABLE messages (
@@ -146,24 +138,22 @@ CREATE TABLE reviews (
     id INT PRIMARY KEY AUTO_INCREMENT,
     order_id INT NOT NULL,
     reviewer_id INT NOT NULL,
-    reviewee_id INT NOT NULL,
     rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
     comment TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id),
     FOREIGN KEY (reviewer_id) REFERENCES users(id),
-    FOREIGN KEY (reviewee_id) REFERENCES users(id)
 );
 
 -- Search history table
-CREATE TABLE search_history (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT,
-    search_term VARCHAR(255) NOT NULL,
-    results_count INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
+-- CREATE TABLE search_history (
+--     id INT PRIMARY KEY AUTO_INCREMENT,
+--     user_id INT,
+--     search_term VARCHAR(255) NOT NULL,
+--     results_count INT DEFAULT 0,
+--     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+--     FOREIGN KEY (user_id) REFERENCES users(id)
+-- );
 
 -- ========================================
 -- 2. SAMPLE DATA INSERTION
