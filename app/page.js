@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../hooks/useAuth.js";
+import About from "../components/aboutus.js"; // Assuming you have an AboutUs component
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -122,8 +123,10 @@ export default function Home() {
   const filteredProducts = products;
 
   return (
+
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 text-gray-800">
       {/* Header */}
+      
       <header className="bg-white shadow-lg py-4 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between rounded-b-2xl">
         <div className="flex items-center mb-4 md:mb-0">
           <Link href="/" className="text-3xl font-bold text-green-700 mr-8 hover:text-green-800 transition duration-300">
@@ -433,6 +436,7 @@ export default function Home() {
             </div>
           )}
         </section>
+        <About/>
       </main>
 
       {/* Footer */}
@@ -442,13 +446,16 @@ export default function Home() {
             <h4 className="text-2xl font-bold mb-2">Rewear</h4>
             <p className="text-sm opacity-80">&copy; 2025 Rewear. All rights reserved.</p>
           </div>
+          
           <nav className="flex flex-wrap justify-center md:justify-end space-x-6">
             <a href="#" className="hover:text-green-200 transition duration-300 ease-in-out">About Us</a>
             <a href="#" className="hover:text-green-200 transition duration-300 ease-in-out">How It Works</a>
             <a href="#" className="hover:text-green-200 transition duration-300 ease-in-out">Contact</a>
             <a href="#" className="hover:text-green-200 transition duration-300 ease-in-out">Privacy Policy</a>
+
           </nav>
         </div>
+        
       </footer>
     </div>
   );
