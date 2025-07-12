@@ -18,7 +18,8 @@
     "next-auth": "^4.24.11",
     "pg": "^8.16.3",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "sweetalert2": "^11.22.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

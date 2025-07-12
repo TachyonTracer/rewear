@@ -36,7 +36,7 @@ export async function POST(request) {
         address: user.address,
         city: user.city,
         state: user.state,
-        type: user.type,
+        account_type: user.type, // Map 'type' to 'account_type' for frontend consistency
         is_verified: user.is_verified,
         profile_image: user.profile_image
       },
@@ -56,7 +56,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('Login error:', error);
     
-    if (error.message === 'User not found' || error.message === 'Invalid credentials') {
+    if (error.message === 'Invalid email or password' || error.message === 'Invalid credentials') {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }

@@ -62,7 +62,7 @@ export async function POST(request) {
         address: user.address,
         city: user.city,
         state: user.state,
-        type: user.type,
+        account_type: user.type, // Map 'type' to 'account_type' for frontend consistency
         is_verified: user.is_verified,
         created_at: user.created_at
       },

@@ -14,7 +14,7 @@ async function handler(request) {
         address: request.user.address,
         city: request.user.city,
         state: request.user.state,
-        type: request.user.type,
+        account_type: request.user.type, // Map 'type' to 'account_type' for frontend consistency
         is_verified: request.user.is_verified,
         profile_image: request.user.profile_image,
         created_at: request.user.created_at
