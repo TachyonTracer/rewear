@@ -155,7 +155,7 @@ export async function POST(request) {
       INSERT INTO products (
         title, description, price, original_price, condition_rating, 
         size, color, category_id, seller_id, image_urls, tags, is_negotiable, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'available')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active')
       RETURNING id, title, price, created_at
     `;
 

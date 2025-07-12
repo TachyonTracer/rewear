@@ -15,6 +15,18 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Get appropriate dashboard path based on user account type
+  const getDashboardPath = () => {
+    if (!user) return '/dashboard/user';
+    
+    const dashboardRoutes = {
+      admin: '/dashboard/admin',
+      user: '/dashboard/user'
+    };
+    
+    return dashboardRoutes[user.account_type] || '/dashboard/user';
+  };
+
   // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -161,7 +173,7 @@ export default function Home() {
               
               {/* Dashboard Link */}
               <Link 
-                href="/dashboard"
+                href={getDashboardPath()}
                 className="text-green-700 hover:text-green-900 font-medium transition duration-300 ease-in-out"
               >
                 Dashboard

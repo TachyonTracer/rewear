@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import Swal from 'sweetalert2';
 import { useAuth } from '../../../hooks/useAuth.js';
 import { fetchWithAuth } from '../../../lib/api.js';
 
@@ -20,7 +21,7 @@ export default function UserDashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!loading && (!user || user.account_type !== 'user')) {
+    if (!loading && (!user || (user.account_type !== 'user' && user.account_type !== 'seller'))) {
       router.push('/');
     }
   }, [user, loading, router]);
@@ -53,6 +54,75 @@ export default function UserDashboard() {
     } finally {
       setDataLoading(false);
     }
+  };
+
+  const handleSwapResponse = async (swapId, response) => {
+    try {
+      const result = await fetchWithAuth(`/api/swaps/${swapId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ response })
+      });
+
+      if (!result.ok) {
+        const error = await result.json();
+        throw new Error(error.error || 'Failed to respond to swap request');
+      }
+
+      Swal.fire({
+        title: 'Success!',
+        text: `Swap request ${response}ed successfully`,
+        icon: 'success',
+        confirmButtonColor: '#3085d6'
+      });
+
+      // Refresh swaps data
+      fetchUserData();
+    } catch (error) {
+      console.error('Error responding to swap:', error);
+      Swal.fire({
+        title: 'Error',
+        text: error.message,
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
+    }
+  };
+
+  const handleAcceptSwap = (swapId) => {
+    Swal.fire({
+      title: 'Accept Swap Request?',
+      text: 'This will complete the swap exchange.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Accept',
+      cancelButtonText: 'Cancel'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        handleSwapResponse(swapId, 'accepted');
+      }
+    });
+  };
+
+  const handleDeclineSwap = (swapId) => {
+    Swal.fire({
+      title: 'Decline Swap Request?',
+      text: 'This action cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Decline',
+      cancelButtonText: 'Cancel'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        handleSwapResponse(swapId, 'rejected');
+      }
+    });
   };
 
   if (loading) {
@@ -106,6 +176,15 @@ export default function UserDashboard() {
                 </div>
                 <span className="text-gray-700">{user.name}</span>
               </div>
+              <Link
+                href="/"
+                className="flex items-center space-x-2 text-green-600 hover:text-green-700 font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <span>Home</span>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="text-red-600 hover:text-red-700 font-medium"
@@ -263,7 +342,7 @@ export default function UserDashboard() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-blue-600 font-medium">Active Swaps</p>
-                        <p className="text-2xl font-bold text-blue-700">{swaps.filter(s => s.status === 'Pending').length}</p>
+                        <p className="text-2xl font-bold text-blue-700">{swaps.filter(s => s.status === 'pending').length}</p>
                       </div>
                       <div className="w-12 h-12 bg-blue-200 rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -449,49 +528,64 @@ export default function UserDashboard() {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
                             <div className={`w-3 h-3 rounded-full ${
-                              swap.type === 'outgoing' ? 'bg-blue-500' : 'bg-green-500'
+                              swap.requester_id === user.id ? 'bg-blue-500' : 'bg-green-500'
                             }`}></div>
                             <div>
                               <h3 className="font-medium text-gray-900">
-                                {swap.type === 'outgoing' ? 'Swap Request Sent' : 'Swap Request Received'}
+                                {swap.requester_id === user.id ? 'Swap Request Sent' : 'Swap Request Received'}
                               </h3>
-                              <p className="text-sm text-gray-600">{swap.date}</p>
+                              <p className="text-sm text-gray-600">
+                                {new Date(swap.created_at).toLocaleDateString()}
+                              </p>
                             </div>
                           </div>
                           <div className="text-right">
                             <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                              swap.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                              swap.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                              swap.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              swap.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                              swap.status === 'rejected' ? 'bg-red-100 text-red-800' :
                               'bg-gray-100 text-gray-800'
                             }`}>
-                              {swap.status}
+                              {swap.status.charAt(0).toUpperCase() + swap.status.slice(1)}
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <span className="flex items-center">
-                            <strong>Your Item:</strong>&nbsp;{swap.itemOffered}
+                            <strong>
+                              {swap.requester_id === user.id ? 'Your Item:' : 'Offered Item:'}
+                            </strong>&nbsp;{swap.offered_product_name}
                           </span>
                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                           </svg>
                           <span className="flex items-center">
-                            <strong>Their Item:</strong>&nbsp;{swap.itemRequested}
+                            <strong>
+                              {swap.requester_id === user.id ? 'Requested Item:' : 'Your Item:'}
+                            </strong>&nbsp;{swap.requested_product_name}
                           </span>
                         </div>
                         <div className="mt-2 text-sm text-gray-600">
-                          <span>With: <strong>{swap.otherUser}</strong></span>
+                          <span>With: <strong>{swap.other_user_name}</strong></span>
                         </div>
-                        {swap.status === 'Pending' && (
+                        {swap.message && (
+                          <div className="mt-2 text-sm text-gray-600">
+                            <span className="font-medium">Message:</span> {swap.message}
+                          </div>
+                        )}
+                        {swap.status === 'pending' && swap.requester_id !== user.id && (
                           <div className="flex space-x-2 mt-4">
-                            <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
+                            <button 
+                              onClick={() => handleAcceptSwap(swap.id)}
+                              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+                            >
                               Accept
                             </button>
-                            <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm">
+                            <button 
+                              onClick={() => handleDeclineSwap(swap.id)}
+                              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
+                            >
                               Decline
-                            </button>
-                            <button className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm">
-                              Message
                             </button>
                           </div>
                         )}

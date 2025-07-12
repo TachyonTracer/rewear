@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import Swal from 'sweetalert2';
 import { useAuth } from '../../../hooks/useAuth.js';
+import { fetchWithAuth } from '../../../lib/api.js';
 
 export default function ItemDetailPage() {
   const { user } = useAuth();
@@ -17,6 +19,11 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [userProducts, setUserProducts] = useState([]);
+  const [selectedUserProduct, setSelectedUserProduct] = useState(null);
+  const [swapMessage, setSwapMessage] = useState('');
+  const [submittingSwap, setSubmittingSwap] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -43,13 +50,87 @@ export default function ItemDetailPage() {
     }
   }, [productId]);
 
-  const handleSwapRequest = () => {
+  const fetchUserProducts = async () => {
+    try {
+      const response = await fetchWithAuth('/api/user/products');
+      if (!response.ok) {
+        throw new Error('Failed to fetch your products');
+      }
+      const data = await response.json();
+      setUserProducts(data.products || []);
+    } catch (err) {
+      console.error('Error fetching user products:', err);
+      Swal.fire({
+        title: 'Error',
+        text: 'Failed to load your products',
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
+    }
+  };
+
+  const handleSwapRequest = async () => {
     if (!user) {
       router.push('/login');
       return;
     }
-    // TODO: Implement swap request functionality
-    alert('Swap request feature coming soon!');
+    
+    // Fetch user's products and show modal
+    await fetchUserProducts();
+    setShowSwapModal(true);
+  };
+
+  const handleSwapSubmit = async () => {
+    if (!selectedUserProduct) {
+      Swal.fire({
+        title: 'Error',
+        text: 'Please select one of your products to swap',
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
+      return;
+    }
+
+    setSubmittingSwap(true);
+    try {
+      const response = await fetchWithAuth('/api/swaps', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requested_product_id: parseInt(productId),
+          offered_product_id: selectedUserProduct,
+          message: swapMessage
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create swap request');
+      }
+
+      Swal.fire({
+        title: 'Success!',
+        text: 'Your swap request has been sent successfully',
+        icon: 'success',
+        confirmButtonColor: '#3085d6'
+      });
+
+      setShowSwapModal(false);
+      setSelectedUserProduct(null);
+      setSwapMessage('');
+    } catch (err) {
+      console.error('Error creating swap request:', err);
+      Swal.fire({
+        title: 'Error',
+        text: err.message,
+        icon: 'error',
+        confirmButtonColor: '#3085d6'
+      });
+    } finally {
+      setSubmittingSwap(false);
+    }
   };
 
   const handleRedeemPoints = () => {
@@ -295,6 +376,123 @@ export default function ItemDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Swap Request Modal */}
+      {showSwapModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Request Swap</h3>
+              <button
+                onClick={() => {
+                  setShowSwapModal(false);
+                  setSelectedUserProduct(null);
+                  setSwapMessage('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                Select one of your products to offer in exchange for &quot;{product?.name}&quot;
+              </p>
+              
+              {userProducts.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">You don&apos;t have any products listed yet.</p>
+                  <button
+                    onClick={() => router.push('/dashboard/user')}
+                    className="text-green-600 hover:text-green-700 font-medium"
+                  >
+                    Add a product to start swapping
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {userProducts.map((userProduct) => (
+                    <div
+                      key={userProduct.id}
+                      onClick={() => setSelectedUserProduct(userProduct.id)}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedUserProduct === userProduct.id
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        {userProduct.image_url && (
+                          <Image
+                            src={userProduct.image_url}
+                            alt={userProduct.name}
+                            width={48}
+                            height={48}
+                            className="w-12 h-12 object-cover rounded-lg"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">{userProduct.name}</h4>
+                          <p className="text-sm text-gray-600">{userProduct.category_name}</p>
+                          <p className="text-sm text-green-600 font-medium">₱{userProduct.price}</p>
+                        </div>
+                        {selectedUserProduct === userProduct.id && (
+                          <div className="text-green-500">
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {userProducts.length > 0 && (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Message (Optional)
+                  </label>
+                  <textarea
+                    value={swapMessage}
+                    onChange={(e) => setSwapMessage(e.target.value)}
+                    placeholder="Add a message to your swap request..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowSwapModal(false);
+                      setSelectedUserProduct(null);
+                      setSwapMessage('');
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    disabled={submittingSwap}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSwapSubmit}
+                    disabled={!selectedUserProduct || submittingSwap}
+                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                  >
+                    {submittingSwap ? 'Sending...' : 'Send Request'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

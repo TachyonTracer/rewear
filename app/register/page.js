@@ -32,11 +32,10 @@ export default function RegisterPage() {
     if (isAuthenticated && user) {
       const dashboardRoutes = {
         admin: '/dashboard/admin',
-        seller: '/dashboard/seller',
         user: '/dashboard/user'
       };
       
-      const route = dashboardRoutes[user.account_type] || '/';
+      const route = dashboardRoutes[user.account_type] || '/dashboard/user';
       router.push(route);
     }
   }, [isAuthenticated, user, router]);
@@ -115,11 +114,10 @@ export default function RegisterPage() {
       // Determine redirect route based on account type
       const dashboardRoutes = {
         admin: '/dashboard/admin',
-        seller: '/dashboard/seller',
         user: '/dashboard/user'
       };
       
-      const redirectRoute = dashboardRoutes[result.user.account_type] || '/';
+      const redirectRoute = dashboardRoutes[result.user.account_type] || '/dashboard/user';
       
       // Show success message
       await Swal.fire({
