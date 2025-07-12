@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../hooks/useAuth.js";
-import About from "../components/aboutus.js"; // Assuming you have an AboutUs component
+import About from "../components/aboutus.js"; 
+// Assuming you have an AboutUs component
+import ContactPage from "../components/contact.js";
 
 export default function Home() {
   const { user, logout } = useAuth();
@@ -432,6 +434,7 @@ export default function Home() {
           )}
         </section>
         <About/>
+        <ContactPage/>
       </main>
 
       {/* Footer */}
