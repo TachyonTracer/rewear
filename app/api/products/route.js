@@ -117,3 +117,76 @@ async function handler(request) {
 }
 
 export const GET = withOptionalAuth(handler);
+
+// POST handler for creating new products
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    
+    // For now, we'll create products without authentication
+    // In a real app, you'd require authentication
+    const {
+      title,
+      description,
+      price,
+      original_price,
+      condition_rating,
+      size,
+      color,
+      category_id,
+      image_urls,
+      tags,
+      is_negotiable
+    } = body;
+
+    // Validate required fields
+    if (!title || !description || !price || !category_id) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // For demo purposes, use a default seller_id
+    // In a real app, you'd get this from the authenticated user
+    const seller_id = 1; // Using the first user as default seller
+
+    const insertQuery = `
+      INSERT INTO products (
+        title, description, price, original_price, condition_rating, 
+        size, color, category_id, seller_id, image_urls, tags, is_negotiable, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'available')
+      RETURNING id, title, price, created_at
+    `;
+
+    const values = [
+      title,
+      description,
+      price,
+      original_price,
+      condition_rating || 'good',
+      size,
+      color,
+      category_id,
+      seller_id,
+      image_urls || [],
+      tags || [],
+      is_negotiable || false
+    ];
+
+    const result = await query(insertQuery, values);
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Product created successfully',
+      product: result.rows[0]
+    }, { status: 201 });
+
+  } catch (error) {
+    console.error('Create product error:', error);
+    return NextResponse.json(
+      { error: 'Failed to create product' },
+      { status: 500 }
+    );
+  }
+}
